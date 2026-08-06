@@ -129,9 +129,10 @@ function restoreDefaultDestination() {
 
 async function createAutocomplete(host, placeholder, onSelect) {
   const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
-  const autocomplete = new PlaceAutocompleteElement();
+  const autocomplete = new PlaceAutocompleteElement({
+    includedRegionCodes: ["JP"]
+  });
   autocomplete.placeholder = placeholder;
-  autocomplete.componentRestrictions = { country: "jp" };
   autocomplete.style.width = "100%";
   host.replaceChildren(autocomplete);
 
