@@ -1,0 +1,9 @@
+{
+  "name": "Commute Simulator",
+  "short_name": "通勤シミュレーター",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#eef2f7",
+  "theme_color": "#1769e0",
+  "description": "車と公共交通の移動時間を比較する個人用Webアプリ"
+}

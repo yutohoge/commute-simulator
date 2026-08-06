@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1769e0">
+  <meta name="description" content="車と公共交通の移動時間を比較する個人用Webアプリ">
+  <title>Commute Simulator</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">COMMUTE SIMULATOR v1.0</p>
+      <h1>通勤・移動時間シミュレーター</h1>
+    </div>
+    <button id="resetButton" class="subtle-button" type="button">初期化</button>
+  </header>
+
+  <main class="app-layout">
+    <section class="panel controls" aria-label="検索条件">
+      <div id="setupWarning" class="warning hidden">
+        <strong>APIキーが未設定です。</strong>
+        <span><code>js/config.js</code>のキーを置き換えてから公開してください。</span>
+      </div>
+
+      <div class="location-block">
+        <div class="title-row">
+          <h2>出発地</h2>
+          <button id="currentLocationButton" class="mini-button" type="button">現在地</button>
+        </div>
+        <div id="originAutocomplete" class="autocomplete-host"></div>
+        <p id="originLabel" class="location-label">地図をタップするか、場所を検索してください。</p>
+      </div>
+
+      <div class="location-block">
+        <div class="title-row">
+          <h2>目的地</h2>
+          <button id="defaultDestinationButton" class="mini-button" type="button">追浜駅に戻す</button>
+        </div>
+        <div id="destinationAutocomplete" class="autocomplete-host"></div>
+        <p id="destinationLabel" class="location-label">京急追浜駅</p>
+        <p class="privacy-note">入力した目的地や検索履歴は保存しません。</p>
+      </div>
+
+      <fieldset>
+        <legend>移動手段</legend>
+        <div class="segmented">
+          <label><input type="radio" name="mode" value="DRIVING" checked><span>車</span></label>
+          <label><input type="radio" name="mode" value="TRANSIT"><span>公共交通</span></label>
+          <label><input type="radio" name="mode" value="COMPARE"><span>比較</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>出発時刻</legend>
+        <div class="preset-grid">
+          <button class="preset active" data-preset="NOW" type="button">現在</button>
+          <button class="preset" data-preset="WEEKDAY_0730" type="button">平日 7:30</button>
+          <button class="preset" data-preset="WEEKDAY_0800" type="button">平日 8:00</button>
+          <button class="preset" data-preset="WEEKDAY_1800" type="button">平日 18:00</button>
+        </div>
+        <label class="input-label" for="customDateTime">任意日時</label>
+        <input id="customDateTime" class="datetime-input" type="datetime-local">
+      </fieldset>
+
+      <fieldset id="drivingOptions">
+        <legend>車ルート設定</legend>
+        <label class="check-row"><input id="avoidTolls" type="checkbox"> 有料道路を避ける</label>
+        <label class="check-row"><input id="avoidHighways" type="checkbox"> 高速道路を避ける</label>
+        <label class="check-row"><input id="avoidFerries" type="checkbox" checked> フェリーを避ける</label>
+      </fieldset>
+
+      <button id="searchButton" class="primary-button" type="button" disabled>この条件で検索</button>
+      <p class="api-note">地図のタップやピン移動だけではRoutes APIを呼びません。検索ボタンを押したときだけ経路を計算します。</p>
+    </section>
+
+    <section class="map-panel" aria-label="地図">
+      <div id="map"></div>
+      <div class="map-tip">地図をタップして出発地点を選択</div>
+    </section>
+
+    <section class="panel results" aria-label="検索結果">
+      <div class="title-row">
+        <div>
+          <p class="eyebrow">RESULT</p>
+          <h2>移動時間</h2>
+        </div>
+        <span id="resultTime" class="result-time"></span>
+      </div>
+
+      <div id="status" class="status" aria-live="polite">出発地を設定してください。</div>
+      <div id="resultCards" class="result-cards"></div>
+
+      <button id="openGoogleMapsButton" class="secondary-button hidden" type="button">
+        Googleマップで開く
+      </button>
+
+      <details>
+        <summary>プライバシーとAPI利用</summary>
+        <p>経路や場所を検索すると、指定した地点・日時がGoogle Maps Platformへ送信されます。</p>
+        <p>目的地と検索履歴は永続保存しません。同一条件の結果は、このページを閉じるまで最大30分間だけメモリ内で再利用します。</p>
+      </details>
+    </section>
+  </main>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
