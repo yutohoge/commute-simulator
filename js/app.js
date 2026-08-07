@@ -591,13 +591,20 @@ const NEARBY_FACILITY_CATEGORIES = [
     ]
   },
   {
-    key: "station",
-    label: "鉄道駅",
+    key: "railStation",
+    label: "電車・地下鉄駅",
     types: [
       "train_station",
       "subway_station",
-      "light_rail_station",
-      "transit_station"
+      "light_rail_station"
+    ]
+  },
+  {
+    key: "busStop",
+    label: "バス停",
+    types: [
+      "bus_stop",
+      "bus_station"
     ]
   }
 ];
@@ -1141,7 +1148,7 @@ function renderCandidateNearbyPanel(
       `候補地点から約${(
         NEARBY_SEARCH_RADIUS_METERS /
         1000
-      ).toFixed(1)}km圏内のスーパー・コンビニ・ドラッグストア・ジム・鉄道駅を検索します。距離は直線距離です。`;
+      ).toFixed(1)}km圏内のスーパー・コンビニ・ドラッグストア・ジム・電車・地下鉄駅・バス停を検索します。距離は直線距離です。`;
 
     const button =
       document.createElement(

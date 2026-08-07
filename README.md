@@ -1,75 +1,51 @@
-# Commute Simulator v2.1 — 周辺施設
+# Commute Simulator v2.1.1 — 交通施設分類の改善
 
 GitHubで上書きするファイル:
 
 - index.html
-- css/style.css
 - js/app.js
 
-config.js とAPIキーは変更不要です。
-Places API (New) が有効になっている必要があります。
+css/style.css は変更なしです。
+config.js とAPIキーも変更不要です。
 
-## v2.1追加機能
+## v2.1.1変更内容
 
-候補カードに「周辺施設」を追加しました。
+周辺施設の交通カテゴリを整理しました。
 
-検索対象:
+旧:
+- 鉄道駅
+  - train_station
+  - subway_station
+  - light_rail_station
+  - transit_station
+
+新:
+- 電車・地下鉄駅
+  - train_station
+  - subway_station
+  - light_rail_station
+
+- バス停
+  - bus_stop
+  - bus_station
+
+`transit_station` は分類が曖昧で、バス停が鉄道駅として表示される原因になるため検索対象から外しました。
+
+## API利用
+
+変更なしです。
+
+「周辺施設を検索」1回につき:
+- Nearby Search 1回
+
+6カテゴリを1回の検索でまとめて取得します。
+
+対象カテゴリ:
 - スーパー
 - コンビニ
 - ドラッグストア
 - ジム
-- 鉄道駅
+- 電車・地下鉄駅
+- バス停
 
-仕様:
-- 候補地点から半径1.5km
-- Nearby Search (New)
-- 1回の検索で最大20件を取得
-- 距離順に検索
-- 各カテゴリで最寄りの施設を表示
-- 距離は候補地点からの直線距離
-- 各施設をGoogle Mapsで開ける
-- 検索結果は候補データと一緒にsessionStorageへ保存
-- タブを閉じると消える
-- 表示だけではPlaces APIを呼ばない
-- 「検索」「再検索」を押した場合だけPlaces APIを1回使用
-
-## 専有面積
-
-小数第2位まで入力可能:
-例 52.15㎡
-
-自動計算の
-- 1㎡あたり家賃
-- 実質住居費単価
-
-にも小数第2位までの面積がそのまま反映されます。
-
-## API利用を抑える設計
-
-周辺施設の取得は自動実行しません。
-
-候補を追加:
-Places API 0回
-
-プロフィールを編集:
-Places API 0回
-
-周辺施設欄を開く:
-Places API 0回
-
-「周辺施設を検索」:
-Places API 1回
-
-取得済み結果を見る:
-Places API 0回
-
-「周辺施設を再検索」:
-Places API 1回
-
-## 注意
-
-一度のNearby Searchで複数カテゴリをまとめて取得するため、
-密集地域では特定カテゴリが上位20件に入らず
-「今回の検索では見つからず」と表示される場合があります。
-
-これは「1.5km圏内に絶対に存在しない」という意味ではありません。
+表示やカテゴリ分けだけでは追加のAPIリクエストは発生しません。
