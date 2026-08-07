@@ -78,7 +78,24 @@
 
     <section class="map-panel" aria-label="地図">
       <div id="map"></div>
-      <div class="map-tip">地図をタップして出発地点を選択</div>
+
+      <div class="map-selection-panel" aria-label="地図で選択する地点">
+        <p class="map-selection-title">地図で選択する地点</p>
+
+        <div class="map-target-switch" role="group" aria-label="地図タップ対象">
+          <button id="mapTargetOrigin" class="map-target-button active" type="button" data-map-target="ORIGIN" aria-pressed="true">
+            <span class="target-dot origin-dot"></span>
+            出発地
+          </button>
+
+          <button id="mapTargetDestination" class="map-target-button" type="button" data-map-target="DESTINATION" aria-pressed="false">
+            <span class="target-dot destination-dot"></span>
+            目的地
+          </button>
+        </div>
+
+        <p id="mapSelectionHint" class="map-selection-hint">地図をタップして出発地を選択</p>
+      </div>
     </section>
 
     <section class="panel results" aria-label="検索結果">
@@ -93,9 +110,7 @@
       <div id="status" class="status" aria-live="polite">出発地を設定してください。</div>
       <div id="resultCards" class="result-cards"></div>
 
-      <button id="openGoogleMapsButton" class="secondary-button hidden" type="button">
-        Googleマップで開く
-      </button>
+      <button id="openGoogleMapsButton" class="secondary-button hidden" type="button">Googleマップで開く</button>
 
       <details>
         <summary>プライバシーとAPI利用</summary>
