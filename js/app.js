@@ -1,4 +1,5 @@
 import { CONFIG } from "./config.js";
+
 import {
   apiKeyIsConfigured,
   loadGoogleMaps
@@ -23,22 +24,31 @@ import {
 ========================================================= */
 
 const state = {
+
   map: null,
 
   AdvancedMarkerElement: null,
+
   Route: null,
 
   originMarker: null,
+
   destinationMarker: null,
 
   polylines: [],
 
   origin: null,
+
   originLabel: "",
 
   destination: {
-    label: CONFIG.DEFAULT_DESTINATION.label,
-    address: CONFIG.DEFAULT_DESTINATION.address,
+
+    label:
+      CONFIG.DEFAULT_DESTINATION.label,
+
+    address:
+      CONFIG.DEFAULT_DESTINATION.address,
+
     location: {
       ...CONFIG.DEFAULT_DESTINATION.location
     }
@@ -55,62 +65,101 @@ const state = {
 ========================================================= */
 
 const el = {
+
   setupWarning:
-    document.getElementById("setupWarning"),
+    document.getElementById(
+      "setupWarning"
+    ),
 
   map:
-    document.getElementById("map"),
+    document.getElementById(
+      "map"
+    ),
 
   originAutocomplete:
-    document.getElementById("originAutocomplete"),
+    document.getElementById(
+      "originAutocomplete"
+    ),
 
   destinationAutocomplete:
-    document.getElementById("destinationAutocomplete"),
+    document.getElementById(
+      "destinationAutocomplete"
+    ),
 
   originLabel:
-    document.getElementById("originLabel"),
+    document.getElementById(
+      "originLabel"
+    ),
 
   destinationLabel:
-    document.getElementById("destinationLabel"),
+    document.getElementById(
+      "destinationLabel"
+    ),
 
   currentLocationButton:
-    document.getElementById("currentLocationButton"),
+    document.getElementById(
+      "currentLocationButton"
+    ),
 
   defaultDestinationButton:
-    document.getElementById("defaultDestinationButton"),
+    document.getElementById(
+      "defaultDestinationButton"
+    ),
 
   resetButton:
-    document.getElementById("resetButton"),
+    document.getElementById(
+      "resetButton"
+    ),
 
   customDateTime:
-    document.getElementById("customDateTime"),
+    document.getElementById(
+      "customDateTime"
+    ),
 
   drivingOptions:
-    document.getElementById("drivingOptions"),
+    document.getElementById(
+      "drivingOptions"
+    ),
 
   avoidTolls:
-    document.getElementById("avoidTolls"),
+    document.getElementById(
+      "avoidTolls"
+    ),
 
   avoidHighways:
-    document.getElementById("avoidHighways"),
+    document.getElementById(
+      "avoidHighways"
+    ),
 
   avoidFerries:
-    document.getElementById("avoidFerries"),
+    document.getElementById(
+      "avoidFerries"
+    ),
 
   searchButton:
-    document.getElementById("searchButton"),
+    document.getElementById(
+      "searchButton"
+    ),
 
   status:
-    document.getElementById("status"),
+    document.getElementById(
+      "status"
+    ),
 
   resultCards:
-    document.getElementById("resultCards"),
+    document.getElementById(
+      "resultCards"
+    ),
 
   resultTime:
-    document.getElementById("resultTime"),
+    document.getElementById(
+      "resultTime"
+    ),
 
   openGoogleMapsButton:
-    document.getElementById("openGoogleMapsButton")
+    document.getElementById(
+      "openGoogleMapsButton"
+    )
 };
 
 
@@ -118,30 +167,43 @@ const el = {
    Basic UI
 ========================================================= */
 
-function setStatus(message, type = "") {
-  el.status.textContent = message;
+function setStatus(
+  message,
+  type = ""
+) {
+
+  el.status.textContent =
+    message;
+
   el.status.className =
     `status ${type}`.trim();
 }
 
 
 function selectedMode() {
+
   return (
+
     document.querySelector(
       'input[name="mode"]:checked'
-    )?.value || "DRIVING"
+    )?.value ||
+
+    "DRIVING"
   );
 }
 
 
 /* =========================================================
-   Map
+   Map display
 ========================================================= */
 
 function clearPolylines() {
 
   state.polylines.forEach(
-    (polyline) => polyline.setMap(null)
+    (polyline) => {
+
+      polyline.setMap(null);
+    }
   );
 
   state.polylines = [];
@@ -154,7 +216,8 @@ function clearDisplayedResult() {
 
   el.resultCards.replaceChildren();
 
-  el.resultTime.textContent = "";
+  el.resultTime.textContent =
+    "";
 
   el.openGoogleMapsButton
     .classList
@@ -168,18 +231,31 @@ function clearDisplayedResult() {
    Origin
 ========================================================= */
 
-function setOrigin(location, label) {
+function setOrigin(
+  location,
+  label
+) {
 
   state.origin = {
-    lat: Number(location.lat),
-    lng: Number(location.lng)
+
+    lat:
+      Number(location.lat),
+
+    lng:
+      Number(location.lng)
   };
 
-  state.originLabel = label;
 
-  el.originLabel.textContent = label;
+  state.originLabel =
+    label;
 
-  el.searchButton.disabled = false;
+
+  el.originLabel.textContent =
+    label;
+
+
+  el.searchButton.disabled =
+    false;
 
 
   /* ---------- Create marker ---------- */
@@ -189,13 +265,17 @@ function setOrigin(location, label) {
     state.originMarker =
       new state.AdvancedMarkerElement({
 
-        map: state.map,
+        map:
+          state.map,
 
-        position: state.origin,
+        position:
+          state.origin,
 
-        title: label,
+        title:
+          label,
 
-        gmpDraggable: true
+        gmpDraggable:
+          true
       });
 
 
@@ -208,30 +288,48 @@ function setOrigin(location, label) {
         const position =
           state.originMarker.position;
 
-        if (!position) return;
+
+        if (!position) {
+
+          return;
+        }
 
 
         const literal =
-          typeof position.toJSON === "function"
+
+          typeof position.toJSON ===
+          "function"
 
             ? position.toJSON()
 
             : {
-                lat: Number(position.lat),
-                lng: Number(position.lng)
+
+                lat:
+                  Number(
+                    position.lat
+                  ),
+
+                lng:
+                  Number(
+                    position.lng
+                  )
               };
 
 
-        state.origin = literal;
+        state.origin =
+          literal;
+
 
         state.originLabel =
           "ピンを移動した地点";
+
 
         el.originLabel.textContent =
           state.originLabel;
 
 
         clearDisplayedResult();
+
 
         setStatus(
           "条件を確認して検索ボタンを押してください。"
@@ -251,14 +349,24 @@ function setOrigin(location, label) {
 
   /* ---------- Move map ---------- */
 
-  state.map.panTo(state.origin);
+  state.map.panTo(
+    state.origin
+  );
 
-  if ((state.map.getZoom() || 0) < 14) {
-    state.map.setZoom(14);
+
+  if (
+    (state.map.getZoom() || 0) <
+    14
+  ) {
+
+    state.map.setZoom(
+      14
+    );
   }
 
 
   clearDisplayedResult();
+
 
   setStatus(
     "条件を確認して検索ボタンを押してください。"
@@ -279,8 +387,16 @@ function setDestination(
   state.destination = {
 
     location: {
-      lat: Number(location.lat),
-      lng: Number(location.lng)
+
+      lat:
+        Number(
+          location.lat
+        ),
+
+      lng:
+        Number(
+          location.lng
+        )
     },
 
     label,
@@ -289,14 +405,17 @@ function setDestination(
   };
 
 
+  /*
+   * 表示は施設名・駅名を優先
+   */
+
   el.destinationLabel.textContent =
-    address
-      ? `${label}｜${address}`
-      : label;
+    label;
 
 
   state.destinationMarker.position =
     state.destination.location;
+
 
   state.destinationMarker.title =
     label;
@@ -338,19 +457,21 @@ async function createAutocomplete(
 
 
   /*
-   * Places API (New)
-   * 日本国内の検索候補を優先
+   * 日本国内に検索候補を制限
    */
 
   const autocomplete =
     new PlaceAutocompleteElement({
 
-      includedRegionCodes: ["JP"]
+      includedRegionCodes: [
+        "JP"
+      ]
     });
 
 
   autocomplete.placeholder =
     placeholder;
+
 
   autocomplete.style.width =
     "100%";
@@ -361,11 +482,13 @@ async function createAutocomplete(
   );
 
 
-  /* ---------- Selected place ---------- */
+  /* ---------- Place selected ---------- */
 
   autocomplete.addEventListener(
     "gmp-select",
-    async ({ placePrediction }) => {
+    async ({
+      placePrediction
+    }) => {
 
       try {
 
@@ -376,8 +499,11 @@ async function createAutocomplete(
         await place.fetchFields({
 
           fields: [
+
             "displayName",
+
             "formattedAddress",
+
             "location"
           ]
         });
@@ -391,6 +517,21 @@ async function createAutocomplete(
         }
 
 
+        /*
+         * 検索欄も
+         * 「金沢八景駅」
+         * のような施設名へ置換
+         */
+
+        autocomplete.value =
+
+          place.displayName ||
+
+          place.formattedAddress ||
+
+          "";
+
+
         onSelect({
 
           location:
@@ -398,25 +539,39 @@ async function createAutocomplete(
 
           label:
             place.displayName ||
+
             place.formattedAddress ||
+
             placeholder,
 
           address:
-            place.formattedAddress || ""
+            place.formattedAddress ||
+
+            ""
         });
+
 
       } catch (error) {
 
-        console.error(error);
+        console.error(
+          error
+        );
+
 
         setStatus(
+
           error.message ||
+
           "場所の取得に失敗しました。",
+
           "error"
         );
       }
     }
   );
+
+
+  return autocomplete;
 }
 
 
@@ -424,38 +579,54 @@ async function createAutocomplete(
    Route request
 ========================================================= */
 
-function createRouteRequest(mode) {
+function createRouteRequest(
+  mode
+) {
 
   const departureTime =
     resolveDepartureTime(
+
       state.preset,
+
       el.customDateTime.value
     );
 
 
   /*
-   * TRANSITとDRIVINGでは
-   * 必要なfieldを分ける
+   * 必要なfieldをモード別に設定
    */
 
   const fields =
+
     mode === "TRANSIT"
 
       ? [
+
           "path",
+
           "legs",
+
           "viewport",
+
           "durationMillis",
+
           "distanceMeters",
+
           "warnings"
         ]
 
       : [
+
           "path",
+
           "viewport",
+
           "durationMillis",
+
           "staticDurationMillis",
+
           "distanceMeters",
+
           "warnings"
         ];
 
@@ -481,10 +652,12 @@ function createRouteRequest(mode) {
      Driving
   ===================================================== */
 
-  if (mode === "DRIVING") {
+  if (
+    mode === "DRIVING"
+  ) {
 
     /*
-     * 実時間交通状況を考慮
+     * リアルタイム交通状況を考慮
      *
      * trafficModelは指定しない。
      * BEST_GUESSがデフォルト。
@@ -508,38 +681,21 @@ function createRouteRequest(mode) {
   }
 
 
-  /* =====================================================
-     Transit
-  ===================================================== */
-
-  if (mode === "TRANSIT") {
-
-    request.transitPreference = {
-
-      /*
-       * 日本で主に利用する公共交通
-       */
-
-      allowedTransitModes: [
-        "BUS",
-        "SUBWAY",
-        "TRAIN",
-        "LIGHT_RAIL",
-        "RAIL"
-      ],
-
-      /*
-       * 乗換回数を少なめにする傾向
-       */
-
-      routingPreference:
-        "FEWER_TRANSFERS"
-    };
-  }
+  /*
+   * TRANSITは
+   * travelMode: "TRANSIT"
+   * のみでまず問い合わせる。
+   *
+   * transitPreferenceは
+   * あえて指定しないことで、
+   * Google側の最適経路判定に任せる。
+   */
 
 
   return {
+
     request,
+
     departureTime
   };
 }
@@ -549,13 +705,20 @@ function createRouteRequest(mode) {
    Compute Route
 ========================================================= */
 
-async function computeRoute(mode) {
+async function computeRoute(
+  mode
+) {
 
   const {
+
     request,
+
     departureTime
+
   } =
-    createRouteRequest(mode);
+    createRouteRequest(
+      mode
+    );
 
 
   const cacheParams = {
@@ -582,20 +745,27 @@ async function computeRoute(mode) {
 
 
   const key =
-    createCacheKey(cacheParams);
+    createCacheKey(
+      cacheParams
+    );
 
 
   /* ---------- Cache ---------- */
 
   const cached =
-    getCachedResult(key);
+    getCachedResult(
+      key
+    );
 
 
   if (cached) {
 
     return {
+
       ...cached,
-      fromCache: true
+
+      fromCache:
+        true
     };
   }
 
@@ -610,9 +780,13 @@ async function computeRoute(mode) {
     );
 
 
-  if (!routes?.length) {
+  if (
+    !routes?.length
+  ) {
 
-    if (mode === "TRANSIT") {
+    if (
+      mode === "TRANSIT"
+    ) {
 
       throw new Error(
         "この条件では公共交通ルートが見つかりませんでした。"
@@ -641,7 +815,9 @@ async function computeRoute(mode) {
 
 
   storeCachedResult(
+
     key,
+
     result
   );
 
@@ -654,36 +830,56 @@ async function computeRoute(mode) {
    Formatting
 ========================================================= */
 
-function durationText(milliseconds) {
+function durationText(
+  milliseconds
+) {
 
-  if (!Number.isFinite(milliseconds)) {
+  if (
+    !Number.isFinite(
+      milliseconds
+    )
+  ) {
+
     return "—";
   }
 
 
   const totalMinutes =
+
     Math.max(
+
       1,
+
       Math.round(
-        milliseconds / 60000
+
+        milliseconds /
+        60000
       )
     );
 
 
-  if (totalMinutes < 60) {
+  if (
+    totalMinutes <
+    60
+  ) {
 
     return `${totalMinutes}分`;
   }
 
 
   const hours =
+
     Math.floor(
-      totalMinutes / 60
+
+      totalMinutes /
+      60
     );
 
 
   const minutes =
-    totalMinutes % 60;
+
+    totalMinutes %
+    60;
 
 
   return minutes
@@ -694,34 +890,56 @@ function durationText(milliseconds) {
 }
 
 
-function distanceText(meters) {
+function distanceText(
+  meters
+) {
 
-  if (!Number.isFinite(meters)) {
+  if (
+    !Number.isFinite(
+      meters
+    )
+  ) {
+
     return "—";
   }
 
 
-  if (meters < 1000) {
+  if (
+    meters <
+    1000
+  ) {
 
-    return `${Math.round(meters)} m`;
+    return `${Math.round(
+      meters
+    )} m`;
   }
 
 
-  return `${(meters / 1000).toFixed(1)} km`;
+  return `${(
+    meters /
+    1000
+  ).toFixed(1)} km`;
 }
 
 
 /* =========================================================
-   Result Card
+   Result card
 ========================================================= */
 
-function createResultCard(result) {
+function createResultCard(
+  result
+) {
 
   const {
+
     route,
+
     mode,
+
     departureTime,
+
     fromCache
+
   } =
     result;
 
@@ -741,11 +959,15 @@ function createResultCard(result) {
 
       departureTime.getTime() +
 
-      (route.durationMillis || 0)
+      (
+        route.durationMillis ||
+        0
+      )
     );
 
 
   const modeLabel =
+
     mode === "DRIVING"
 
       ? "車"
@@ -767,13 +989,17 @@ function createResultCard(result) {
 
   header.innerHTML = `
 
-    <h3>${modeLabel}</h3>
+    <h3>
+      ${modeLabel}
+    </h3>
 
     <span class="cache-label">
 
       ${
         fromCache
+
           ? "直前の結果を再利用"
+
           : "新規取得"
       }
 
@@ -818,7 +1044,13 @@ function createResultCard(result) {
       距離<br>
 
       <strong>
-        ${distanceText(route.distanceMeters)}
+
+        ${
+          distanceText(
+            route.distanceMeters
+          )
+        }
+
       </strong>
 
     </div>
@@ -832,13 +1064,20 @@ function createResultCard(result) {
 
         ${
           new Intl.DateTimeFormat(
+
             "ja-JP",
+
             {
-              hour: "2-digit",
-              minute: "2-digit"
+              hour:
+                "2-digit",
+
+              minute:
+                "2-digit"
             }
           )
-          .format(arrivalTime)
+          .format(
+            arrivalTime
+          )
         }
 
       </strong>
@@ -848,32 +1087,45 @@ function createResultCard(result) {
 
 
   card.append(
+
     header,
+
     duration,
+
     meta
   );
 
 
   /* =====================================================
-     Driving traffic difference
+     Driving traffic
   ===================================================== */
 
   if (
-    mode === "DRIVING" &&
+
+    mode ===
+    "DRIVING" &&
+
     Number.isFinite(
       route.staticDurationMillis
     )
   ) {
 
     const increase =
+
       Math.round(
 
         (
-          (route.durationMillis || 0) -
+
+          (
+            route.durationMillis ||
+            0
+          ) -
 
           route.staticDurationMillis
 
-        ) / 60000
+        ) /
+
+        60000
       );
 
 
@@ -888,7 +1140,9 @@ function createResultCard(result) {
 
 
     note.textContent =
-      increase > 0
+
+      increase >
+      0
 
         ? `交通状況による増加目安：+${increase}分`
 
@@ -905,7 +1159,10 @@ function createResultCard(result) {
      Transit
   ===================================================== */
 
-  if (mode === "TRANSIT") {
+  if (
+    mode ===
+    "TRANSIT"
+  ) {
 
     const note =
       document.createElement(
@@ -929,7 +1186,9 @@ function createResultCard(result) {
 
   /* ---------- Warnings ---------- */
 
-  if (route.warnings?.length) {
+  if (
+    route.warnings?.length
+  ) {
 
     const warning =
       document.createElement(
@@ -942,7 +1201,9 @@ function createResultCard(result) {
 
 
     warning.textContent =
-      route.warnings.join(" ");
+      route.warnings.join(
+        " "
+      );
 
 
     card.appendChild(
@@ -959,7 +1220,9 @@ function createResultCard(result) {
    Render results
 ========================================================= */
 
-function renderResults(results) {
+function renderResults(
+  results
+) {
 
   el.resultCards.replaceChildren();
 
@@ -981,34 +1244,52 @@ function renderResults(results) {
      Compare
   ===================================================== */
 
-  if (results.length === 2) {
+  if (
+    results.length ===
+    2
+  ) {
 
     const driving =
+
       results.find(
         (item) =>
-          item.mode === "DRIVING"
+          item.mode ===
+          "DRIVING"
       );
 
 
     const transit =
+
       results.find(
         (item) =>
-          item.mode === "TRANSIT"
+          item.mode ===
+          "TRANSIT"
       );
 
 
-    if (driving && transit) {
+    if (
+      driving &&
+      transit
+    ) {
 
       const drivingDuration =
-        driving.route.durationMillis || 0;
+
+        driving.route.durationMillis ||
+
+        0;
 
 
       const transitDuration =
-        transit.route.durationMillis || 0;
+
+        transit.route.durationMillis ||
+
+        0;
 
 
       const faster =
-        drivingDuration <= transitDuration
+
+        drivingDuration <=
+        transitDuration
 
           ? "車"
 
@@ -1016,14 +1297,18 @@ function renderResults(results) {
 
 
       const difference =
+
         Math.round(
 
           Math.abs(
 
             drivingDuration -
+
             transitDuration
 
-          ) / 60000
+          ) /
+
+          60000
         );
 
 
@@ -1038,7 +1323,9 @@ function renderResults(results) {
 
 
       note.textContent =
-        difference === 0
+
+        difference ===
+        0
 
           ? "車と公共交通の予測時間はほぼ同じです。"
 
@@ -1054,36 +1341,38 @@ function renderResults(results) {
 
 
 /* =========================================================
-   Draw Route
+   Draw route
 ========================================================= */
 
-function drawRoute(route) {
+function drawRoute(
+  route
+) {
 
   clearPolylines();
 
-
-  /*
-   * TRANSITの場合、
-   * path + legsがあることで
-   * multimodal polylineを描画可能
-   */
 
   state.polylines =
     route.createPolylines();
 
 
   state.polylines.forEach(
-    (polyline) =>
+    (polyline) => {
+
       polyline.setMap(
         state.map
-      )
+      );
+    }
   );
 
 
-  if (route.viewport) {
+  if (
+    route.viewport
+  ) {
 
     state.map.fitBounds(
+
       route.viewport,
+
       40
     );
   }
@@ -1091,15 +1380,19 @@ function drawRoute(route) {
 
 
 /* =========================================================
-   Route Search
+   Route search
 ========================================================= */
 
 async function searchRoutes() {
 
-  if (!state.origin) {
+  if (
+    !state.origin
+  ) {
 
     setStatus(
+
       "出発地を設定してください。",
+
       "error"
     );
 
@@ -1108,8 +1401,8 @@ async function searchRoutes() {
 
 
   /*
-   * 新しい検索開始時に
-   * 前回結果を消す
+   * 新しい検索では
+   * 前回結果を先に消す
    */
 
   clearDisplayedResult();
@@ -1120,14 +1413,19 @@ async function searchRoutes() {
 
 
   const modes =
-    mode === "COMPARE"
+
+    mode ===
+    "COMPARE"
 
       ? [
+
           "DRIVING",
+
           "TRANSIT"
         ]
 
       : [
+
           mode
         ];
 
@@ -1137,7 +1435,9 @@ async function searchRoutes() {
 
 
   setStatus(
+
     "経路を計算しています…",
+
     "loading"
   );
 
@@ -1145,15 +1445,18 @@ async function searchRoutes() {
   try {
 
     /*
-     * 比較時に公共交通だけ失敗しても、
-     * 車の結果は表示できるようにする
+     * 比較時に片方が失敗しても、
+     * 成功した方を表示する
      */
 
     const settled =
+
       await Promise.allSettled(
 
         modes.map(
+
           (currentMode) =>
+
             computeRoute(
               currentMode
             )
@@ -1188,10 +1491,14 @@ async function searchRoutes() {
     );
 
 
-    if (!results.length) {
+    if (
+      !results.length
+    ) {
 
       throw (
+
         errors[0] ||
+
         new Error(
           "経路を取得できませんでした。"
         )
@@ -1209,26 +1516,39 @@ async function searchRoutes() {
 
 
     /*
-     * 最短経路を地図へ描画
+     * 最短時間のルートを
+     * 地図へ表示
      */
 
     const routeToDraw =
+
       results.reduce(
 
-        (best, item) => {
+        (
+          best,
+          item
+        ) => {
 
-          if (!best) {
+          if (
+            !best
+          ) {
+
             return item;
           }
 
 
           return (
+
             item.route.durationMillis ||
+
             Infinity
-          ) <
-          (
+
+          ) < (
+
             best.route.durationMillis ||
+
             Infinity
+
           )
 
             ? item
@@ -1246,6 +1566,7 @@ async function searchRoutes() {
 
 
     el.resultTime.textContent =
+
       formatDateTime(
         results[0].departureTime
       );
@@ -1253,17 +1574,23 @@ async function searchRoutes() {
 
     el.openGoogleMapsButton
       .classList
-      .remove("hidden");
+      .remove(
+        "hidden"
+      );
 
 
     /*
-     * Compareで片方だけ失敗
+     * 比較で片方だけ失敗
      */
 
-    if (errors.length) {
+    if (
+      errors.length
+    ) {
 
       setStatus(
+
         `一部の経路を取得できませんでした：${errors[0].message}`,
+
         "error"
       );
 
@@ -1282,9 +1609,12 @@ async function searchRoutes() {
       );
     }
 
+
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      error
+    );
 
 
     setStatus(
@@ -1295,6 +1625,7 @@ async function searchRoutes() {
 
       "error"
     );
+
 
   } finally {
 
@@ -1317,8 +1648,31 @@ function updateModeUi() {
       "hidden",
 
       selectedMode() ===
-        "TRANSIT"
+      "TRANSIT"
     );
+
+
+  /*
+   * 移動手段を変えたら
+   * 古い検索結果を消す
+   */
+
+  if (
+    state.lastResults.length
+  ) {
+
+    clearDisplayedResult();
+
+
+    if (
+      state.origin
+    ) {
+
+      setStatus(
+        "移動手段を変更しました。もう一度検索してください。"
+      );
+    }
+  }
 }
 
 
@@ -1328,18 +1682,22 @@ function updateModeUi() {
 
 function openGoogleMaps() {
 
-  if (!state.origin) {
+  if (
+    !state.origin
+  ) {
+
     return;
   }
 
 
   /*
-   * Compareの場合は
-   * Google Mapsでは車を初期表示
+   * 比較の場合は車で開く
    */
 
   const travelMode =
-    selectedMode() === "TRANSIT"
+
+    selectedMode() ===
+    "TRANSIT"
 
       ? "transit"
 
@@ -1349,7 +1707,8 @@ function openGoogleMaps() {
   const params =
     new URLSearchParams({
 
-      api: "1",
+      api:
+        "1",
 
       origin:
         `${state.origin.lat},${state.origin.lng}`,
@@ -1384,19 +1743,27 @@ function resetApp() {
   clearDisplayedResult();
 
 
-  state.origin = null;
+  state.origin =
+    null;
 
-  state.originLabel = "";
 
-  state.preset = "NOW";
+  state.originLabel =
+    "";
+
+
+  state.preset =
+    "NOW";
 
 
   /* ---------- Origin marker ---------- */
 
-  if (state.originMarker) {
+  if (
+    state.originMarker
+  ) {
 
     state.originMarker.map =
       null;
+
 
     state.originMarker =
       null;
@@ -1429,7 +1796,7 @@ function resetApp() {
           "active",
 
           button.dataset.preset ===
-            "NOW"
+          "NOW"
         );
       }
     );
@@ -1470,7 +1837,10 @@ function bindEvents() {
     "click",
     (event) => {
 
-      if (!event.latLng) {
+      if (
+        !event.latLng
+      ) {
+
         return;
       }
 
@@ -1495,7 +1865,9 @@ function bindEvents() {
       (input) => {
 
         input.addEventListener(
+
           "change",
+
           updateModeUi
         );
       }
@@ -1520,10 +1892,12 @@ function bindEvents() {
                 ".preset"
               )
               .forEach(
-                (item) =>
+                (item) => {
+
                   item.classList.remove(
                     "active"
-                  )
+                  );
+                }
               );
 
 
@@ -1538,6 +1912,24 @@ function bindEvents() {
 
             el.customDateTime.value =
               "";
+
+
+            if (
+              state.lastResults.length
+            ) {
+
+              clearDisplayedResult();
+
+
+              if (
+                state.origin
+              ) {
+
+                setStatus(
+                  "出発時刻を変更しました。もう一度検索してください。"
+                );
+              }
+            }
           }
         );
       }
@@ -1553,6 +1945,7 @@ function bindEvents() {
       if (
         !el.customDateTime.value
       ) {
+
         return;
       }
 
@@ -1562,49 +1955,79 @@ function bindEvents() {
           ".preset"
         )
         .forEach(
-          (item) =>
+          (item) => {
+
             item.classList.remove(
               "active"
-            )
+            );
+          }
         );
 
 
       state.preset =
         "CUSTOM";
+
+
+      if (
+        state.lastResults.length
+      ) {
+
+        clearDisplayedResult();
+
+
+        if (
+          state.origin
+        ) {
+
+          setStatus(
+            "出発時刻を変更しました。もう一度検索してください。"
+          );
+        }
+      }
     }
   );
 
 
   /* ---------- Search ---------- */
 
-  el.searchButton.addEventListener(
-    "click",
-    searchRoutes
-  );
+  el.searchButton
+    .addEventListener(
+
+      "click",
+
+      searchRoutes
+    );
 
 
   /* ---------- Destination reset ---------- */
 
   el.defaultDestinationButton
     .addEventListener(
+
       "click",
+
       restoreDefaultDestination
     );
 
 
-  /* ---------- All reset ---------- */
+  /* ---------- Reset ---------- */
 
-  el.resetButton.addEventListener(
-    "click",
-    resetApp
-  );
+  el.resetButton
+    .addEventListener(
+
+      "click",
+
+      resetApp
+    );
 
 
   /* ---------- Google Maps ---------- */
 
   el.openGoogleMapsButton
     .addEventListener(
+
       "click",
+
       openGoogleMaps
     );
 
@@ -1629,12 +2052,15 @@ function bindEvents() {
             "error"
           );
 
+
           return;
         }
 
 
         setStatus(
+
           "現在地を取得しています…",
+
           "loading"
         );
 
@@ -1642,11 +2068,14 @@ function bindEvents() {
         navigator.geolocation
           .getCurrentPosition(
 
-            ({ coords }) => {
+            ({
+              coords
+            }) => {
 
               setOrigin(
 
                 {
+
                   lat:
                     coords.latitude,
 
@@ -1671,9 +2100,15 @@ function bindEvents() {
 
 
             {
-              enableHighAccuracy: true,
-              timeout: 12000,
-              maximumAge: 60000
+
+              enableHighAccuracy:
+                true,
+
+              timeout:
+                12000,
+
+              maximumAge:
+                60000
             }
           );
       }
@@ -1689,11 +2124,15 @@ async function init() {
 
   /* ---------- API key ---------- */
 
-  if (!apiKeyIsConfigured()) {
+  if (
+    !apiKeyIsConfigured()
+  ) {
 
     el.setupWarning
       .classList
-      .remove("hidden");
+      .remove(
+        "hidden"
+      );
 
 
     el.map.innerHTML = `
@@ -1750,11 +2189,18 @@ async function init() {
 
 
     const [
-      { Map },
 
-      { AdvancedMarkerElement },
+      {
+        Map
+      },
 
-      { Route }
+      {
+        AdvancedMarkerElement
+      },
+
+      {
+        Route
+      }
 
     ] =
       await Promise.all([
@@ -1796,10 +2242,6 @@ async function init() {
           zoom:
             CONFIG.INITIAL_MAP.zoom,
 
-          /*
-           * Advanced Marker使用のため
-           */
-
           mapId:
             "DEMO_MAP_ID",
 
@@ -1839,6 +2281,7 @@ async function init() {
 
     await Promise.all([
 
+
       createAutocomplete(
 
         el.originAutocomplete,
@@ -1847,15 +2290,19 @@ async function init() {
 
         ({
           location,
-          label,
-          address
+          label
         }) => {
+
+          /*
+           * 住所ではなく
+           * displayNameを表示
+           */
 
           setOrigin(
 
             location,
 
-            address || label
+            label
           );
         }
       ),
@@ -1894,7 +2341,9 @@ async function init() {
       toDateTimeLocalValue(
 
         new Date(
+
           Date.now() +
+
           60_000
         )
       );
@@ -1906,27 +2355,36 @@ async function init() {
 
     bindEvents();
 
+
     updateModeUi();
 
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      error
+    );
 
 
     el.setupWarning
       .classList
-      .remove("hidden");
+      .remove(
+        "hidden"
+      );
 
 
     el.setupWarning.innerHTML = `
 
       <strong>
+
         Google Mapsの初期化に失敗しました。
+
       </strong>
 
       <span>
+
         ${error.message}
+
       </span>
     `;
 
