@@ -177,7 +177,6 @@ function createRouteRequest(mode) {
 
   if (mode === "DRIVING") {
     request.routingPreference = "TRAFFIC_AWARE_OPTIMAL";
-    request.trafficModel = "BEST_GUESS";
     request.routeModifiers = {
       avoidTolls: el.avoidTolls.checked,
       avoidHighways: el.avoidHighways.checked,
