@@ -48,6 +48,8 @@ const el = {
   resultCards: document.getElementById("resultCards"),
   resultTime: document.getElementById("resultTime"),
   openGoogleMapsButton: document.getElementById("openGoogleMapsButton"),
+  openTransitMapsButton: document.getElementById("openTransitMapsButton"),
+  transitMapNote: document.getElementById("transitMapNote"),
   mapTargetOrigin: document.getElementById("mapTargetOrigin"),
   mapTargetDestination: document.getElementById("mapTargetDestination"),
   mapSelectionHint: document.getElementById("mapSelectionHint"),
@@ -118,6 +120,17 @@ function clearDisplayedResult() {
   el.resultCards.replaceChildren();
   el.resultTime.textContent = "";
   el.openGoogleMapsButton.classList.add("hidden");
+
+  el.openTransitMapsButton.classList.toggle(
+    "hidden",
+    !state.origin
+  );
+
+  el.transitMapNote.classList.toggle(
+    "hidden",
+    !state.origin
+  );
+
   state.lastResults = [];
   updateCandidateAddButton();
 }
@@ -228,6 +241,14 @@ function setOrigin(location, label, options = {}) {
   state.originLabel = label;
   el.originLabel.textContent = label;
   el.searchButton.disabled = false;
+
+  el.openTransitMapsButton.classList.remove(
+    "hidden"
+  );
+
+  el.transitMapNote.classList.remove(
+    "hidden"
+  );
 
   if (!state.originMarker) {
     state.originMarker = createOriginMarker(state.origin, label);
@@ -450,7 +471,7 @@ function updateCandidateAddButton() {
   );
 }
 
-function trafficIncreaseMinutes(candidate) {
+function trafficAdjustmentMinutes(candidate) {
   if (
     !Number.isFinite(candidate.durationMillis) ||
     !Number.isFinite(candidate.staticDurationMillis)
@@ -458,15 +479,28 @@ function trafficIncreaseMinutes(candidate) {
     return null;
   }
 
-  return Math.max(
-    0,
-    Math.round(
-      (
-        candidate.durationMillis -
-        candidate.staticDurationMillis
-      ) / 60000
-    )
+  return Math.round(
+    (
+      candidate.durationMillis -
+      candidate.staticDurationMillis
+    ) / 60000
   );
+}
+
+function trafficAdjustmentLabel(minutes) {
+  if (!Number.isFinite(minutes)) {
+    return "—";
+  }
+
+  if (minutes > 0) {
+    return `+${minutes}分`;
+  }
+
+  if (minutes < 0) {
+    return `${minutes}分`;
+  }
+
+  return "±0分";
 }
 
 function renderCandidates() {
@@ -522,7 +556,7 @@ function renderCandidates() {
         `candidate-card${index === 0 ? " best" : ""}`;
 
       const increase =
-        trafficIncreaseMinutes(candidate);
+        trafficAdjustmentMinutes(candidate);
 
       card.innerHTML = `
         <div class="candidate-card-top">
@@ -548,15 +582,9 @@ function renderCandidates() {
           </div>
 
           <div class="candidate-metric">
-            渋滞増加<br>
+            交通状況補正<br>
             <strong>
-              ${
-                increase === null
-                  ? "—"
-                  : increase > 0
-                  ? `+${increase}分`
-                  : "ほぼなし"
-              }
+              ${trafficAdjustmentLabel(increase)}
             </strong>
           </div>
         </div>
@@ -568,6 +596,12 @@ function renderCandidates() {
             class="candidate-use-button"
             type="button">
             この地点を使う
+          </button>
+
+          <button
+            class="candidate-transit-button"
+            type="button">
+            公共交通を見る
           </button>
 
           <button
@@ -607,6 +641,23 @@ function renderCandidates() {
 
             setStatus(
               `「${candidate.name}」を出発地に設定しました。必要ならもう一度検索してください。`
+            );
+          }
+        );
+
+      card
+        .querySelector(".candidate-transit-button")
+        .addEventListener(
+          "click",
+          () => {
+            const destination =
+              candidate.destination?.location ||
+              state.destination.location;
+
+            openGoogleMapsDirections(
+              candidate.origin,
+              destination,
+              "transit"
             );
           }
         );
@@ -2156,19 +2207,33 @@ function createResultCard(result) {
   card.append(header, duration, meta);
 
   if (mode === "DRIVING" && Number.isFinite(route.staticDurationMillis)) {
-    const increase = Math.round(((route.durationMillis || 0) - route.staticDurationMillis) / 60000);
+    const adjustment = Math.round(
+      (
+        (route.durationMillis || 0) -
+        route.staticDurationMillis
+      ) / 60000
+    );
+
     const note = document.createElement("p");
     note.className = "result-note";
-    note.textContent = increase > 0
-      ? `交通状況による増加目安：+${increase}分`
-      : "交通状況による大きな増加はありません。";
-    card.appendChild(note);
+    note.textContent =
+      `交通状況による補正：${trafficAdjustmentLabel(adjustment)}`;
+
+    const help = document.createElement("p");
+    help.className = "traffic-adjustment-help";
+    help.textContent =
+      "交通状況を考慮した所要時間 − 同じルートを交通状況なしで走る所要時間";
+
+    card.append(
+      note,
+      help
+    );
   }
 
   if (mode === "TRANSIT") {
     const note = document.createElement("p");
     note.className = "result-note";
-    note.textContent = "徒歩・バス・鉄道を含むGoogleの公共交通経路です。詳細は「Googleマップで開く」から確認できます。";
+    note.textContent = "公共交通のAPI結果です。取得できない場合は専用の「公共交通をGoogleマップで見る」からGoogle Maps本体を確認できます。";
     card.appendChild(note);
   }
 
@@ -2254,6 +2319,14 @@ async function searchRoutes() {
     el.resultTime.textContent = formatDateTime(results[0].departureTime);
     el.openGoogleMapsButton.classList.remove("hidden");
 
+    el.openTransitMapsButton.classList.remove(
+      "hidden"
+    );
+
+    el.transitMapNote.classList.remove(
+      "hidden"
+    );
+
     if (errors.length) {
       setStatus(`一部の経路を取得できませんでした：${errors[0].message}`, "error");
     } else {
@@ -2280,18 +2353,78 @@ function updateModeUi() {
   }
 }
 
+function googleMapsDirectionsUrl(
+  origin,
+  destination,
+  travelMode
+) {
+  const params =
+    new URLSearchParams({
+      api: "1",
+
+      origin:
+        `${origin.lat},${origin.lng}`,
+
+      destination:
+        `${destination.lat},${destination.lng}`,
+
+      travelmode:
+        travelMode
+    });
+
+  return (
+    `https://www.google.com/maps/dir/?${params.toString()}`
+  );
+}
+
+function openGoogleMapsDirections(
+  origin,
+  destination,
+  travelMode
+) {
+  window.open(
+    googleMapsDirectionsUrl(
+      origin,
+      destination,
+      travelMode
+    ),
+    "_blank",
+    "noopener"
+  );
+}
+
 function openGoogleMaps() {
-  if (!state.origin) return;
+  if (!state.origin) {
+    return;
+  }
 
-  const travelMode = selectedMode() === "TRANSIT" ? "transit" : "driving";
-  const params = new URLSearchParams({
-    api: "1",
-    origin: `${state.origin.lat},${state.origin.lng}`,
-    destination: `${state.destination.location.lat},${state.destination.location.lng}`,
-    travelmode: travelMode
-  });
+  const travelMode =
+    selectedMode() === "TRANSIT"
+      ? "transit"
+      : "driving";
 
-  window.open(`https://www.google.com/maps/dir/?${params.toString()}`, "_blank", "noopener");
+  openGoogleMapsDirections(
+    state.origin,
+    state.destination.location,
+    travelMode
+  );
+}
+
+function openTransitGoogleMaps() {
+  if (!state.origin) {
+    setStatus(
+      "出発地を設定してください。",
+      "error"
+    );
+
+    return;
+  }
+
+  openGoogleMapsDirections(
+    state.origin,
+    state.destination.location,
+    "transit"
+  );
 }
 
 function resetApp() {
@@ -2311,6 +2444,15 @@ function resetApp() {
   if (state.originAutocompleteControl) state.originAutocompleteControl.value = "";
 
   el.searchButton.disabled = true;
+
+  el.openTransitMapsButton.classList.add(
+    "hidden"
+  );
+
+  el.transitMapNote.classList.add(
+    "hidden"
+  );
+
   el.customDateTime.value = "";
 
   document.querySelectorAll(".preset").forEach((button) => {
@@ -2377,6 +2519,11 @@ function bindEvents() {
   el.defaultDestinationButton.addEventListener("click", restoreDefaultDestination);
   el.resetButton.addEventListener("click", resetApp);
   el.openGoogleMapsButton.addEventListener("click", openGoogleMaps);
+
+  el.openTransitMapsButton.addEventListener(
+    "click",
+    openTransitGoogleMaps
+  );
 
   el.addCandidateButton.addEventListener(
     "click",

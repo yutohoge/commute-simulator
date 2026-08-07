@@ -876,3 +876,71 @@ details { margin-top: 15px; color: var(--muted); font-size: .76rem; line-height:
     grid-template-columns: 1fr;
   }
 }
+
+
+/* =========================================================
+   Transit shortcut + traffic terminology - v1.3
+========================================================= */
+
+.maps-action-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.maps-action-grid .secondary-button {
+  margin-top: 0;
+}
+
+.transit-map-button {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #4b6fa9;
+  border-radius: 12px;
+  background: #f3f7ff;
+  color: #31557b;
+  font-weight: 800;
+}
+
+.transit-map-button:hover {
+  background: #e8f0ff;
+}
+
+.transit-map-note {
+  margin: 7px 2px 0;
+  color: var(--muted);
+  font-size: .69rem;
+  line-height: 1.45;
+}
+
+.traffic-adjustment-help {
+  margin: 7px 0 0;
+  color: #687588;
+  font-size: .68rem;
+  line-height: 1.4;
+}
+
+.candidate-transit-button {
+  min-height: 35px;
+  border: 1px solid #c8d8ee;
+  border-radius: 9px;
+  background: #f3f7ff;
+  color: #31557b;
+  font-size: .71rem;
+  font-weight: 750;
+}
+
+.candidate-actions {
+  grid-template-columns: 1fr 1fr auto;
+}
+
+@media (max-width: 760px) {
+  .candidate-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .candidate-delete-button {
+    grid-column: 1 / -1;
+  }
+}

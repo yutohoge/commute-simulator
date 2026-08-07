@@ -12,7 +12,7 @@
 <body>
   <header class="app-header">
     <div>
-      <p class="eyebrow">COMMUTE SIMULATOR v1.2.1</p>
+      <p class="eyebrow">COMMUTE SIMULATOR v1.3</p>
       <h1>通勤・移動時間シミュレーター</h1>
     </div>
     <button id="resetButton" class="subtle-button" type="button">初期化</button>
@@ -110,7 +110,19 @@
       <div id="status" class="status" aria-live="polite">出発地を設定してください。</div>
       <div id="resultCards" class="result-cards"></div>
 
-      <button id="openGoogleMapsButton" class="secondary-button hidden" type="button">Googleマップで開く</button>
+      <div class="maps-action-grid">
+        <button id="openGoogleMapsButton" class="secondary-button hidden" type="button">
+          Googleマップで開く
+        </button>
+
+        <button id="openTransitMapsButton" class="transit-map-button hidden" type="button">
+          公共交通をGoogleマップで見る
+        </button>
+      </div>
+
+      <p id="transitMapNote" class="transit-map-note hidden">
+        Google Maps本体の公共交通検索を開きます。このボタンではRoutes APIを呼びません。
+      </p>
 
       <button id="addCandidateButton" class="candidate-add-button hidden" type="button">
         この出発地を候補に追加
@@ -220,6 +232,8 @@
         <summary>プライバシーとAPI利用</summary>
         <p>経路や場所を検索すると、指定した地点・日時がGoogle Maps Platformへ送信されます。</p>
         <p>目的地と検索履歴は永続保存しません。同一条件の結果は、このページを閉じるまで最大30分間だけメモリ内で再利用します。</p>
+        <p>「交通状況による補正」は、交通状況を考慮した所要時間と、同じルートを交通状況なしで走る場合の所要時間との差です。</p>
+        <p>「公共交通をGoogleマップで見る」はGoogle Maps本体を開くリンクで、Routes APIの公共交通検索は使用しません。</p>
       </details>
     </section>
   </main>
