@@ -12,7 +12,7 @@
 <body>
   <header class="app-header">
     <div>
-      <p class="eyebrow">COMMUTE SIMULATOR v2.1.2</p>
+      <p class="eyebrow">COMMUTE SIMULATOR v2.2</p>
       <h1>通勤・移動時間シミュレーター</h1>
     </div>
     <button id="resetButton" class="subtle-button" type="button">初期化</button>
@@ -155,6 +155,98 @@
       </section>
 
 
+
+
+      <section class="score-section" aria-label="総合スコア">
+        <div class="candidate-header">
+          <div>
+            <p class="eyebrow">TOTAL SCORE</p>
+            <h2>総合スコア</h2>
+          </div>
+          <span id="scoreCandidateCount" class="candidate-count">未算出</span>
+        </div>
+
+        <p class="candidate-storage-note">
+          保存した候補どうしを100点満点の相対スコアで比較します。評価の重みは自由に変更できます。
+        </p>
+
+        <details id="scoreSettings" class="score-settings">
+          <summary>評価の重みを変更</summary>
+
+          <div class="score-settings-body">
+            <p class="score-settings-help">
+              重みは自動で100%換算します。0にした項目は評価から除外され、その項目が未入力でもスコアを算出できます。
+            </p>
+
+            <div class="score-weight-grid">
+              <label class="score-weight-field">
+                <span>車通勤</span>
+                <div>
+                  <input id="scoreWeightCommute" type="number" min="0" max="100" step="1" inputmode="numeric">
+                  <span>重み</span>
+                </div>
+              </label>
+
+              <label class="score-weight-field">
+                <span>月額住居費</span>
+                <div>
+                  <input id="scoreWeightHousing" type="number" min="0" max="100" step="1" inputmode="numeric">
+                  <span>重み</span>
+                </div>
+              </label>
+
+              <label class="score-weight-field">
+                <span>専有面積</span>
+                <div>
+                  <input id="scoreWeightArea" type="number" min="0" max="100" step="1" inputmode="numeric">
+                  <span>重み</span>
+                </div>
+              </label>
+
+              <label class="score-weight-field">
+                <span>築年数</span>
+                <div>
+                  <input id="scoreWeightAge" type="number" min="0" max="100" step="1" inputmode="numeric">
+                  <span>重み</span>
+                </div>
+              </label>
+
+              <label class="score-weight-field">
+                <span>駅徒歩</span>
+                <div>
+                  <input id="scoreWeightWalk" type="number" min="0" max="100" step="1" inputmode="numeric">
+                  <span>重み</span>
+                </div>
+              </label>
+
+              <label class="score-weight-field">
+                <span>周辺利便性</span>
+                <div>
+                  <input id="scoreWeightNearby" type="number" min="0" max="100" step="1" inputmode="numeric">
+                  <span>重み</span>
+                </div>
+              </label>
+            </div>
+
+            <div class="score-settings-footer">
+              <span id="scoreWeightTotal" class="score-weight-total"></span>
+
+              <button id="resetScoreWeightsButton" class="time-slot-secondary-button" type="button">
+                デフォルトに戻す
+              </button>
+            </div>
+
+            <p class="score-method-note">
+              車通勤・住居費・築年数・駅徒歩・周辺距離は短いほど高評価、専有面積は広いほど高評価です。
+              周辺利便性は6カテゴリの最寄り直線距離の平均で、3km検索済みで見つからなかったカテゴリは3kmとして扱います。
+            </p>
+          </div>
+        </details>
+
+        <div id="scoreNotice" class="score-notice"></div>
+        <div id="scoreResultList" class="score-result-list"></div>
+      </section>
+
       <section class="time-compare-section" aria-label="時間帯比較">
         <div class="candidate-header">
           <div>
@@ -246,7 +338,7 @@
         <p>「交通状況による補正」は、交通状況を考慮した所要時間と、同じルートを交通状況なしで走る場合の所要時間との差です。</p>
         <p>「公共交通をGoogleマップで見る」はGoogle Maps本体を開くリンクで、Routes APIの公共交通検索は使用しません。</p>
         <p>周辺施設は候補カードの「周辺施設を検索」を押したときだけPlaces API (New) のNearby Searchを1回実行します。電車・地下鉄駅とバス停は別カテゴリで表示します。結果の表示だけでは追加のPlaces APIリクエストは発生しません。</p>
-        <p>周辺施設までの距離は候補地点からの直線距離です。徒歩ルートの距離ではありません。</p>
+        <p>周辺施設は候補地点から3km圏内を検索し、距離は直線距離で表示します。徒歩ルートの距離ではありません。総合スコアの計算だけではAPIを呼びません。</p>
       </details>
     </section>
   </main>

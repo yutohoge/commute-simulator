@@ -57,6 +57,19 @@ const el = {
 
   addCandidateButton: document.getElementById("addCandidateButton"),
   candidateCount: document.getElementById("candidateCount"),
+
+  scoreCandidateCount: document.getElementById("scoreCandidateCount"),
+  scoreSettings: document.getElementById("scoreSettings"),
+  scoreWeightCommute: document.getElementById("scoreWeightCommute"),
+  scoreWeightHousing: document.getElementById("scoreWeightHousing"),
+  scoreWeightArea: document.getElementById("scoreWeightArea"),
+  scoreWeightAge: document.getElementById("scoreWeightAge"),
+  scoreWeightWalk: document.getElementById("scoreWeightWalk"),
+  scoreWeightNearby: document.getElementById("scoreWeightNearby"),
+  scoreWeightTotal: document.getElementById("scoreWeightTotal"),
+  resetScoreWeightsButton: document.getElementById("resetScoreWeightsButton"),
+  scoreNotice: document.getElementById("scoreNotice"),
+  scoreResultList: document.getElementById("scoreResultList"),
   candidateConditionNotice: document.getElementById("candidateConditionNotice"),
   candidateEmpty: document.getElementById("candidateEmpty"),
   candidateList: document.getElementById("candidateList"),
@@ -552,7 +565,7 @@ function trafficAdjustmentLabel(minutes) {
 
 
 
-const NEARBY_SEARCH_RADIUS_METERS = 1500;
+const NEARBY_SEARCH_RADIUS_METERS = 3000;
 const NEARBY_SEARCH_MAX_RESULTS = 20;
 
 const NEARBY_FACILITY_CATEGORIES = [
@@ -1101,6 +1114,15 @@ async function searchNearbyFacilities(
   }
 }
 
+
+function nearbyDataIsCurrent(nearby) {
+  return Boolean(
+    nearby &&
+    Number(nearby.radiusMeters) ===
+      NEARBY_SEARCH_RADIUS_METERS
+  );
+}
+
 function renderCandidateNearbyPanel(
   candidate,
   details
@@ -1121,6 +1143,62 @@ function renderCandidateNearbyPanel(
     );
 
   panel.replaceChildren();
+
+  if (
+    nearby &&
+    !nearbyDataIsCurrent(
+      nearby
+    )
+  ) {
+    status.textContent =
+      "要再検索";
+
+    status.classList.remove(
+      "filled"
+    );
+
+    const intro =
+      document.createElement("p");
+
+    intro.className =
+      "nearby-search-intro";
+
+    intro.textContent =
+      `検索範囲を3.0kmへ拡大しました。旧${(
+        nearby.radiusMeters /
+        1000
+      ).toFixed(1)}kmの結果は総合スコアには使用しません。3.0kmで再検索してください。`;
+
+    const button =
+      document.createElement(
+        "button"
+      );
+
+    button.type =
+      "button";
+
+    button.className =
+      "nearby-search-button";
+
+    button.textContent =
+      "3kmで周辺施設を再検索（Places API 1回）";
+
+    button.addEventListener(
+      "click",
+      () =>
+        searchNearbyFacilities(
+          candidate.id,
+          button
+        )
+    );
+
+    panel.append(
+      intro,
+      button
+    );
+
+    return;
+  }
 
   if (!nearby) {
     status.textContent =
@@ -2198,6 +2276,874 @@ function clearCandidateProfile() {
   );
 }
 
+
+/* =========================================================
+   Total score - v2.2
+========================================================= */
+
+const SCORE_WEIGHT_STORAGE_KEY =
+  "commuteSimulatorScoreWeightsV2_2";
+
+const DEFAULT_SCORE_WEIGHTS = {
+  commute: 30,
+  housing: 25,
+  area: 15,
+  age: 10,
+  walk: 10,
+  nearby: 10
+};
+
+let scoreWeights = {
+  ...DEFAULT_SCORE_WEIGHTS
+};
+
+const SCORE_CRITERIA = [
+  {
+    key: "commute",
+    label: "車通勤",
+    lowerIsBetter: true
+  },
+  {
+    key: "housing",
+    label: "月額住居費",
+    lowerIsBetter: true
+  },
+  {
+    key: "area",
+    label: "専有面積",
+    lowerIsBetter: false
+  },
+  {
+    key: "age",
+    label: "築年数",
+    lowerIsBetter: true
+  },
+  {
+    key: "walk",
+    label: "駅徒歩",
+    lowerIsBetter: true
+  },
+  {
+    key: "nearby",
+    label: "周辺利便性",
+    lowerIsBetter: true
+  }
+];
+
+function sanitizeScoreWeight(value) {
+  const numeric =
+    Number(value);
+
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(numeric)
+    )
+  );
+}
+
+function loadScoreWeights() {
+  const raw =
+    safeSessionStorageGet(
+      SCORE_WEIGHT_STORAGE_KEY
+    );
+
+  if (!raw) {
+    scoreWeights = {
+      ...DEFAULT_SCORE_WEIGHTS
+    };
+    return;
+  }
+
+  try {
+    const parsed =
+      JSON.parse(raw);
+
+    scoreWeights = {};
+
+    Object.keys(
+      DEFAULT_SCORE_WEIGHTS
+    ).forEach(
+      (key) => {
+        scoreWeights[key] =
+          sanitizeScoreWeight(
+            parsed?.[key] ??
+            DEFAULT_SCORE_WEIGHTS[
+              key
+            ]
+          );
+      }
+    );
+  } catch {
+    scoreWeights = {
+      ...DEFAULT_SCORE_WEIGHTS
+    };
+  }
+}
+
+function persistScoreWeights() {
+  safeSessionStorageSet(
+    SCORE_WEIGHT_STORAGE_KEY,
+    JSON.stringify(
+      scoreWeights
+    )
+  );
+}
+
+function setScoreWeightInputs() {
+  el.scoreWeightCommute.value =
+    scoreWeights.commute;
+
+  el.scoreWeightHousing.value =
+    scoreWeights.housing;
+
+  el.scoreWeightArea.value =
+    scoreWeights.area;
+
+  el.scoreWeightAge.value =
+    scoreWeights.age;
+
+  el.scoreWeightWalk.value =
+    scoreWeights.walk;
+
+  el.scoreWeightNearby.value =
+    scoreWeights.nearby;
+
+  const total =
+    Object.values(
+      scoreWeights
+    ).reduce(
+      (sum, value) =>
+        sum + value,
+      0
+    );
+
+  el.scoreWeightTotal.textContent =
+    total > 0
+      ? `入力重み 合計${total} → 自動で100%換算`
+      : "重みがすべて0です";
+}
+
+function updateScoreWeightsFromInputs() {
+  scoreWeights = {
+    commute:
+      sanitizeScoreWeight(
+        el.scoreWeightCommute.value
+      ),
+
+    housing:
+      sanitizeScoreWeight(
+        el.scoreWeightHousing.value
+      ),
+
+    area:
+      sanitizeScoreWeight(
+        el.scoreWeightArea.value
+      ),
+
+    age:
+      sanitizeScoreWeight(
+        el.scoreWeightAge.value
+      ),
+
+    walk:
+      sanitizeScoreWeight(
+        el.scoreWeightWalk.value
+      ),
+
+    nearby:
+      sanitizeScoreWeight(
+        el.scoreWeightNearby.value
+      )
+  };
+
+  persistScoreWeights();
+  setScoreWeightInputs();
+  renderScoreComparison();
+}
+
+function resetScoreWeights() {
+  scoreWeights = {
+    ...DEFAULT_SCORE_WEIGHTS
+  };
+
+  persistScoreWeights();
+  setScoreWeightInputs();
+  renderScoreComparison();
+}
+
+function nearbyConvenienceDistance(
+  candidate
+) {
+  const nearby =
+    normalizeNearbyData(
+      candidate.nearby
+    );
+
+  if (
+    !nearby ||
+    !nearbyDataIsCurrent(
+      nearby
+    )
+  ) {
+    return null;
+  }
+
+  const distances =
+    NEARBY_FACILITY_CATEGORIES.map(
+      (category) => {
+        const facility =
+          nearby.facilities[
+            category.key
+          ];
+
+        if (
+          facility &&
+          Number.isFinite(
+            facility.distanceMeters
+          )
+        ) {
+          return Math.min(
+            facility.distanceMeters,
+            NEARBY_SEARCH_RADIUS_METERS
+          );
+        }
+
+        return NEARBY_SEARCH_RADIUS_METERS;
+      }
+    );
+
+  return (
+    distances.reduce(
+      (sum, value) =>
+        sum + value,
+      0
+    ) /
+    distances.length
+  );
+}
+
+function candidateScoreValues(
+  candidate
+) {
+  const profile =
+    normalizeCandidateProfile(
+      candidate.profile
+    );
+
+  const calc =
+    candidateProfileCalculations(
+      profile
+    );
+
+  return {
+    commute:
+      Number.isFinite(
+        candidate.durationMillis
+      )
+        ? candidate.durationMillis /
+          60000
+        : null,
+
+    housing:
+      Number.isFinite(
+        calc.totalMonthlyCost
+      )
+        ? calc.totalMonthlyCost
+        : null,
+
+    area:
+      Number.isFinite(
+        profile.areaSqm
+      ) &&
+      profile.areaSqm > 0
+        ? profile.areaSqm
+        : null,
+
+    age:
+      Number.isFinite(
+        profile.buildingAgeYears
+      )
+        ? profile.buildingAgeYears
+        : null,
+
+    walk:
+      Number.isFinite(
+        profile.stationWalkMinutes
+      )
+        ? profile.stationWalkMinutes
+        : null,
+
+    nearby:
+      nearbyConvenienceDistance(
+        candidate
+      )
+  };
+}
+
+function activeScoreCriteria() {
+  return SCORE_CRITERIA.filter(
+    (criterion) =>
+      (
+        scoreWeights[
+          criterion.key
+        ] || 0
+      ) > 0
+  );
+}
+
+function missingScoreCriteria(
+  values
+) {
+  return activeScoreCriteria()
+    .filter(
+      (criterion) =>
+        !Number.isFinite(
+          values[
+            criterion.key
+          ]
+        )
+    )
+    .map(
+      (criterion) =>
+        criterion.label
+    );
+}
+
+function relativeCriterionScore(
+  value,
+  minValue,
+  maxValue,
+  lowerIsBetter
+) {
+  if (
+    !Number.isFinite(value) ||
+    !Number.isFinite(minValue) ||
+    !Number.isFinite(maxValue)
+  ) {
+    return null;
+  }
+
+  if (
+    Math.abs(
+      maxValue -
+      minValue
+    ) < 1e-9
+  ) {
+    return 100;
+  }
+
+  const raw =
+    lowerIsBetter
+      ? (
+          maxValue -
+          value
+        ) /
+        (
+          maxValue -
+          minValue
+        )
+      : (
+          value -
+          minValue
+        ) /
+        (
+          maxValue -
+          minValue
+        );
+
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      raw * 100
+    )
+  );
+}
+
+function calculateScoreResults() {
+  const criteria =
+    activeScoreCriteria();
+
+  const totalWeight =
+    criteria.reduce(
+      (sum, criterion) =>
+        sum +
+        scoreWeights[
+          criterion.key
+        ],
+      0
+    );
+
+  const prepared =
+    state.candidates.map(
+      (candidate) => {
+        const values =
+          candidateScoreValues(
+            candidate
+          );
+
+        return {
+          candidate,
+          values,
+          missing:
+            missingScoreCriteria(
+              values
+            )
+        };
+      }
+    );
+
+  if (
+    totalWeight <= 0 ||
+    criteria.length === 0
+  ) {
+    return {
+      criteria,
+      totalWeight,
+      prepared,
+      scorable: [],
+      scored: []
+    };
+  }
+
+  const scorable =
+    prepared.filter(
+      (item) =>
+        item.missing.length === 0
+    );
+
+  if (scorable.length < 2) {
+    return {
+      criteria,
+      totalWeight,
+      prepared,
+      scorable,
+      scored: []
+    };
+  }
+
+  const ranges = {};
+
+  criteria.forEach(
+    (criterion) => {
+      const values =
+        scorable.map(
+          (item) =>
+            item.values[
+              criterion.key
+            ]
+        );
+
+      ranges[
+        criterion.key
+      ] = {
+        min:
+          Math.min(
+            ...values
+          ),
+
+        max:
+          Math.max(
+            ...values
+          )
+      };
+    }
+  );
+
+  const scored =
+    scorable.map(
+      (item) => {
+        const breakdown = {};
+        let weightedSum = 0;
+
+        criteria.forEach(
+          (criterion) => {
+            const range =
+              ranges[
+                criterion.key
+              ];
+
+            const criterionScore =
+              relativeCriterionScore(
+                item.values[
+                  criterion.key
+                ],
+                range.min,
+                range.max,
+                criterion.lowerIsBetter
+              );
+
+            breakdown[
+              criterion.key
+            ] =
+              criterionScore;
+
+            weightedSum +=
+              criterionScore *
+              scoreWeights[
+                criterion.key
+              ];
+          }
+        );
+
+        return {
+          ...item,
+          breakdown,
+          totalScore:
+            weightedSum /
+            totalWeight
+        };
+      }
+    )
+    .sort(
+      (a, b) =>
+        b.totalScore -
+        a.totalScore
+    );
+
+  return {
+    criteria,
+    totalWeight,
+    prepared,
+    scorable,
+    scored
+  };
+}
+
+function formatScoreValue(
+  criterionKey,
+  value
+) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+
+  if (criterionKey === "commute") {
+    return `${Math.round(value)}分`;
+  }
+
+  if (criterionKey === "housing") {
+    return formatYen(value);
+  }
+
+  if (criterionKey === "area") {
+    return formatSquareMeters(
+      value
+    );
+  }
+
+  if (criterionKey === "age") {
+    return `築${value}年`;
+  }
+
+  if (criterionKey === "walk") {
+    return `${value}分`;
+  }
+
+  if (criterionKey === "nearby") {
+    return formatNearbyDistance(
+      value
+    ).replace(
+      "（直線）",
+      ""
+    );
+  }
+
+  return String(value);
+}
+
+function renderScoreComparison() {
+  const result =
+    calculateScoreResults();
+
+  el.scoreResultList.replaceChildren();
+
+  el.scoreCandidateCount.textContent =
+    state.candidates.length
+      ? `${state.candidates.length}件`
+      : "未算出";
+
+  el.scoreNotice.className =
+    "score-notice";
+
+  if (!state.candidates.length) {
+    el.scoreNotice.textContent =
+      "候補を追加すると総合スコアを比較できます。";
+
+    return;
+  }
+
+  if (
+    result.totalWeight <= 0
+  ) {
+    el.scoreNotice.textContent =
+      "評価の重みがすべて0です。1項目以上に重みを設定してください。";
+
+    el.scoreNotice.classList.add(
+      "warning"
+    );
+
+    return;
+  }
+
+  const unavailable =
+    result.prepared.filter(
+      (item) =>
+        item.missing.length > 0
+    );
+
+  if (
+    result.scorable.length < 2
+  ) {
+    el.scoreNotice.textContent =
+      `総合スコアには、必要情報が揃った候補が2件以上必要です。現在の比較可能候補は${result.scorable.length}件です。`;
+
+    el.scoreNotice.classList.add(
+      "warning"
+    );
+  } else {
+    el.scoreNotice.textContent =
+      `比較可能な${result.scorable.length}件を候補内で相対評価しています。最高条件を100、最低条件を0として各項目を換算し、設定した重みで合成します。`;
+
+    el.scoreNotice.classList.add(
+      "success"
+    );
+  }
+
+  result.scored.forEach(
+    (item, index) => {
+      const card =
+        document.createElement(
+          "article"
+        );
+
+      card.className =
+        `score-result-card${
+          index === 0
+            ? " best"
+            : ""
+        }`;
+
+      const top =
+        document.createElement(
+          "div"
+        );
+
+      top.className =
+        "score-result-top";
+
+      const rank =
+        document.createElement(
+          "span"
+        );
+
+      rank.className =
+        "score-rank";
+
+      rank.textContent =
+        `${index + 1}`;
+
+      const name =
+        document.createElement(
+          "p"
+        );
+
+      name.className =
+        "score-name";
+
+      name.textContent =
+        item.candidate.name;
+
+      const total =
+        document.createElement(
+          "span"
+        );
+
+      total.className =
+        "score-total";
+
+      total.textContent =
+        `${Math.round(
+          item.totalScore
+        )}点`;
+
+      top.append(
+        rank,
+        name,
+        total
+      );
+
+      const breakdown =
+        document.createElement(
+          "div"
+        );
+
+      breakdown.className =
+        "score-breakdown";
+
+      result.criteria.forEach(
+        (criterion) => {
+          const box =
+            document.createElement(
+              "div"
+            );
+
+          box.className =
+            "score-breakdown-item";
+
+          const label =
+            document.createElement(
+              "span"
+            );
+
+          label.textContent =
+            `${criterion.label}｜重み${scoreWeights[criterion.key]}`;
+
+          const value =
+            document.createElement(
+              "strong"
+            );
+
+          value.textContent =
+            `${Math.round(
+              item.breakdown[
+                criterion.key
+              ]
+            )}点・${formatScoreValue(
+              criterion.key,
+              item.values[
+                criterion.key
+              ]
+            )}`;
+
+          box.append(
+            label,
+            value
+          );
+
+          breakdown.appendChild(
+            box
+          );
+        }
+      );
+
+      const note =
+        document.createElement(
+          "p"
+        );
+
+      note.className =
+        "score-relative-note";
+
+      note.textContent =
+        "この点数は現在保存されている比較可能候補の中での相対評価です。";
+
+      card.append(
+        top,
+        breakdown,
+        note
+      );
+
+      el.scoreResultList.appendChild(
+        card
+      );
+    }
+  );
+
+  unavailable.forEach(
+    (item) => {
+      const card =
+        document.createElement(
+          "article"
+        );
+
+      card.className =
+        "score-result-card unavailable";
+
+      const top =
+        document.createElement(
+          "div"
+        );
+
+      top.className =
+        "score-result-top";
+
+      const name =
+        document.createElement(
+          "p"
+        );
+
+      name.className =
+        "score-name";
+
+      name.textContent =
+        item.candidate.name;
+
+      const total =
+        document.createElement(
+          "span"
+        );
+
+      total.className =
+        "score-total";
+
+      total.textContent =
+        "算出不可";
+
+      top.append(
+        name,
+        total
+      );
+
+      const missing =
+        document.createElement(
+          "p"
+        );
+
+      missing.className =
+        "score-missing";
+
+      missing.textContent =
+        `不足：${item.missing.join(
+          " / "
+        )}`;
+
+      card.append(
+        top,
+        missing
+      );
+
+      el.scoreResultList.appendChild(
+        card
+      );
+    }
+  );
+}
+
+function candidateTotalScore(
+  candidateId
+) {
+  const result =
+    calculateScoreResults();
+
+  const match =
+    result.scored.find(
+      (item) =>
+        item.candidate.id ===
+        candidateId
+    );
+
+  return match
+    ? match.totalScore
+    : null;
+}
+
 function renderCandidates() {
   const sorted = [...state.candidates].sort(
     (a, b) =>
@@ -2354,6 +3300,34 @@ function renderCandidates() {
         }
       );
 
+      const totalScore =
+        candidateTotalScore(
+          candidate.id
+        );
+
+      if (
+        Number.isFinite(
+          totalScore
+        )
+      ) {
+        const scoreChip =
+          document.createElement(
+            "span"
+          );
+
+        scoreChip.className =
+          "candidate-score-chip";
+
+        scoreChip.textContent =
+          `総合 ${Math.round(
+            totalScore
+          )}点`;
+
+        teaser.appendChild(
+          scoreChip
+        );
+      }
+
       if (!teaser.children.length) {
         teaser.classList.add(
           "hidden"
@@ -2441,6 +3415,8 @@ function renderCandidates() {
       );
     }
   );
+
+  renderScoreComparison();
 }
 
 function openCandidateDialog() {
@@ -4543,6 +5519,27 @@ function bindEvents() {
     }
   );
 
+  [
+    el.scoreWeightCommute,
+    el.scoreWeightHousing,
+    el.scoreWeightArea,
+    el.scoreWeightAge,
+    el.scoreWeightWalk,
+    el.scoreWeightNearby
+  ].forEach(
+    (input) => {
+      input.addEventListener(
+        "change",
+        updateScoreWeightsFromInputs
+      );
+    }
+  );
+
+  el.resetScoreWeightsButton.addEventListener(
+    "click",
+    resetScoreWeights
+  );
+
   el.addTimeSlotButton.addEventListener(
     "click",
     () => {
@@ -4702,9 +5699,11 @@ async function init() {
     el.customDateTime.min = toDateTimeLocalValue(new Date(Date.now() + 60000));
 
     loadCandidates();
+    loadScoreWeights();
     loadTimeSlotSettings();
     loadTimeComparison();
 
+    setScoreWeightInputs();
     renderTimeSlotSettings();
     renderCandidates();
     renderTimeComparison();
