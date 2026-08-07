@@ -73,9 +73,14 @@ const el = {
   runTimeCompareButton: document.getElementById("runTimeCompareButton"),
   timeCompareStatus: document.getElementById("timeCompareStatus"),
   timeCompareResult: document.getElementById("timeCompareResult"),
+  timeCompareHeadRow: document.getElementById("timeCompareHeadRow"),
   timeCompareBody: document.getElementById("timeCompareBody"),
   timeCompareSummary: document.getElementById("timeCompareSummary"),
-  clearTimeCompareButton: document.getElementById("clearTimeCompareButton")
+  clearTimeCompareButton: document.getElementById("clearTimeCompareButton"),
+
+  timeSlotInputs: document.getElementById("timeSlotInputs"),
+  addTimeSlotButton: document.getElementById("addTimeSlotButton"),
+  resetTimeSlotsButton: document.getElementById("resetTimeSlotsButton")
 };
 
 function setStatus(message, type = "") {
@@ -476,6 +481,8 @@ function renderCandidates() {
   el.candidateCount.textContent =
     `${sorted.length}件`;
 
+  updateTimeCompareControls();
+
   el.candidateEmpty.classList.toggle(
     "hidden",
     sorted.length > 0
@@ -616,6 +623,7 @@ function renderCandidates() {
               );
 
             persistCandidates();
+            clearTimeComparison();
             renderCandidates();
           }
         );
@@ -778,6 +786,7 @@ function savePendingCandidate() {
   }
 
   persistCandidates();
+  clearTimeComparison();
   renderCandidates();
   closeCandidateDialog();
 
@@ -793,13 +802,310 @@ function savePendingCandidate() {
 ========================================================= */
 
 const TIME_COMPARISON_STORAGE_KEY =
-  "commuteSimulatorTimeComparisonV1_2";
+  "commuteSimulatorTimeComparisonV1_2_1";
 
-const TIME_SLOTS = [
-  { key: "0730", label: "7:30", hour: 7, minute: 30 },
-  { key: "0800", label: "8:00", hour: 8, minute: 0 },
-  { key: "1800", label: "18:00", hour: 18, minute: 0 }
+const TIME_SLOT_SETTINGS_KEY =
+  "commuteSimulatorTimeSlotsV1_2_1";
+
+const DEFAULT_TIME_SLOT_VALUES = [
+  "07:30",
+  "08:00",
+  "18:00"
 ];
+
+let activeTimeSlots = [];
+
+function normalizeTimeValue(value) {
+  const match =
+    /^([01]\d|2[0-3]):([0-5]\d)$/.exec(
+      String(value || "")
+    );
+
+  if (!match) {
+    return null;
+  }
+
+  return `${match[1]}:${match[2]}`;
+}
+
+function slotFromValue(value) {
+  const normalized =
+    normalizeTimeValue(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const [hour, minute] =
+    normalized
+      .split(":")
+      .map(Number);
+
+  return {
+    key:
+      normalized.replace(":", ""),
+
+    value:
+      normalized,
+
+    label:
+      `${hour}:${String(minute).padStart(2, "0")}`,
+
+    hour,
+    minute
+  };
+}
+
+function sortActiveTimeSlots() {
+  activeTimeSlots.sort(
+    (a, b) =>
+      (
+        a.hour * 60 +
+        a.minute
+      ) -
+      (
+        b.hour * 60 +
+        b.minute
+      )
+  );
+}
+
+function selectedTimeSlots() {
+  return [...activeTimeSlots];
+}
+
+function loadTimeSlotSettings() {
+  const raw =
+    safeSessionStorageGet(
+      TIME_SLOT_SETTINGS_KEY
+    );
+
+  if (!raw) {
+    activeTimeSlots =
+      DEFAULT_TIME_SLOT_VALUES
+        .map(slotFromValue);
+    return;
+  }
+
+  try {
+    const parsed =
+      JSON.parse(raw);
+
+    const slots =
+      Array.isArray(parsed)
+        ? parsed
+            .map(slotFromValue)
+            .filter(Boolean)
+        : [];
+
+    const uniqueSlots =
+      slots.filter(
+        (slot, index, array) =>
+          array.findIndex(
+            (item) =>
+              item.value === slot.value
+          ) === index
+      );
+
+    activeTimeSlots =
+      uniqueSlots.length
+        ? uniqueSlots.slice(0, 3)
+        : DEFAULT_TIME_SLOT_VALUES
+            .map(slotFromValue);
+
+    sortActiveTimeSlots();
+  } catch {
+    activeTimeSlots =
+      DEFAULT_TIME_SLOT_VALUES
+        .map(slotFromValue);
+  }
+}
+
+function persistTimeSlotSettings() {
+  safeSessionStorageSet(
+    TIME_SLOT_SETTINGS_KEY,
+    JSON.stringify(
+      activeTimeSlots.map(
+        (slot) => slot.value
+      )
+    )
+  );
+}
+
+function setTimeCompareStatus(
+  message,
+  isError = false
+) {
+  el.timeCompareStatus.textContent =
+    message;
+
+  el.timeCompareStatus.classList.remove(
+    "hidden"
+  );
+
+  el.timeCompareStatus.classList.toggle(
+    "error",
+    isError
+  );
+}
+
+function renderTimeSlotSettings() {
+  el.timeSlotInputs.replaceChildren();
+
+  activeTimeSlots.forEach(
+    (slot, index) => {
+      const row =
+        document.createElement("div");
+
+      row.className =
+        "time-slot-row";
+
+      const number =
+        document.createElement("span");
+
+      number.className =
+        "time-slot-number";
+
+      number.textContent =
+        `${index + 1}`;
+
+      const input =
+        document.createElement("input");
+
+      input.type = "time";
+      input.className =
+        "time-slot-input";
+      input.value = slot.value;
+      input.step = 300;
+
+      input.setAttribute(
+        "aria-label",
+        `比較時刻${index + 1}`
+      );
+
+      input.addEventListener(
+        "change",
+        () => {
+          const normalized =
+            normalizeTimeValue(
+              input.value
+            );
+
+          if (!normalized) {
+            input.value =
+              activeTimeSlots[index].value;
+            return;
+          }
+
+          const duplicate =
+            activeTimeSlots.some(
+              (item, itemIndex) =>
+                itemIndex !== index &&
+                item.value === normalized
+            );
+
+          if (duplicate) {
+            input.value =
+              activeTimeSlots[index].value;
+
+            setTimeCompareStatus(
+              "同じ時刻は複数登録できません。",
+              true
+            );
+
+            return;
+          }
+
+          activeTimeSlots[index] =
+            slotFromValue(
+              normalized
+            );
+
+          sortActiveTimeSlots();
+          persistTimeSlotSettings();
+
+          clearTimeComparison();
+          renderTimeSlotSettings();
+          updateTimeCompareControls();
+
+          setTimeCompareStatus(
+            "比較時刻を変更しました。時間帯比較を再実行してください。"
+          );
+        }
+      );
+
+      const removeButton =
+        document.createElement("button");
+
+      removeButton.type =
+        "button";
+
+      removeButton.className =
+        "time-slot-remove-button";
+
+      removeButton.textContent =
+        "削除";
+
+      removeButton.disabled =
+        activeTimeSlots.length <= 1;
+
+      removeButton.addEventListener(
+        "click",
+        () => {
+          if (
+            activeTimeSlots.length <= 1
+          ) {
+            return;
+          }
+
+          activeTimeSlots.splice(
+            index,
+            1
+          );
+
+          persistTimeSlotSettings();
+
+          clearTimeComparison();
+          renderTimeSlotSettings();
+          updateTimeCompareControls();
+
+          setTimeCompareStatus(
+            "比較時刻を削除しました。"
+          );
+        }
+      );
+
+      row.append(
+        number,
+        input,
+        removeButton
+      );
+
+      el.timeSlotInputs.appendChild(
+        row
+      );
+    }
+  );
+
+  el.addTimeSlotButton.disabled =
+    activeTimeSlots.length >= 3;
+}
+
+function resetTimeSlots() {
+  activeTimeSlots =
+    DEFAULT_TIME_SLOT_VALUES
+      .map(slotFromValue);
+
+  persistTimeSlotSettings();
+
+  clearTimeComparison();
+  renderTimeSlotSettings();
+  updateTimeCompareControls();
+
+  setTimeCompareStatus(
+    "比較時刻を 7:30 / 8:00 / 18:00 に戻しました。"
+  );
+}
 
 function nextWeekdayForBatch() {
   const result = new Date();
@@ -857,6 +1163,11 @@ function batchConditionSignature(baseDate) {
     },
 
     date: baseDate.toISOString().slice(0, 10),
+
+    timeSlots:
+      selectedTimeSlots().map(
+        (slot) => slot.value
+      ),
 
     avoidTolls: el.avoidTolls.checked,
     avoidHighways: el.avoidHighways.checked,
@@ -953,14 +1264,24 @@ function updateTimeCompareControls() {
   );
 
   if (count > 0) {
+    const slots =
+      selectedTimeSlots();
+
     const maxRequests =
-      count * TIME_SLOTS.length;
+      count * slots.length;
+
+    const labels =
+      slots
+        .map(
+          (slot) => slot.label
+        )
+        .join(" / ");
 
     el.timeCompareApiEstimate.textContent =
-      `候補${count}件 × 3時間帯 = 最大${maxRequests}回の経路計算。候補追加や表を見るだけではAPIを呼びません。`;
+      `比較時刻 ${labels}｜候補${count}件 × ${slots.length}時間帯 = 最大${maxRequests}回の経路計算。候補追加や表を見るだけではAPIを呼びません。`;
 
     el.runTimeCompareButton.textContent =
-      `3時間帯を一括比較（最大${maxRequests}回）`;
+      `${slots.length}時間帯を一括比較（最大${maxRequests}回）`;
   }
 }
 
@@ -990,7 +1311,7 @@ function average(values) {
 }
 
 function calculateRowStats(row) {
-  const values = TIME_SLOTS
+  const values = selectedTimeSlots()
     .map(
       (slot) =>
         row.times[slot.key]?.durationMillis
@@ -1036,6 +1357,46 @@ function renderTimeComparison() {
 
     el.timeCompareResult.classList.add(
       "hidden"
+    );
+
+    el.timeCompareHeadRow.replaceChildren();
+
+    const candidateHead =
+      document.createElement("th");
+
+    candidateHead.textContent =
+      "候補";
+
+    el.timeCompareHeadRow.appendChild(
+      candidateHead
+    );
+
+    selectedTimeSlots().forEach(
+      (slot) => {
+        const th =
+          document.createElement("th");
+
+        th.textContent =
+          slot.label;
+
+        el.timeCompareHeadRow.appendChild(
+          th
+        );
+      }
+    );
+
+    ["平均", "最大", "ブレ"].forEach(
+      (label) => {
+        const th =
+          document.createElement("th");
+
+        th.textContent =
+          label;
+
+        el.timeCompareHeadRow.appendChild(
+          th
+        );
+      }
     );
 
     el.timeCompareBody.replaceChildren();
@@ -1089,7 +1450,7 @@ function renderTimeComparison() {
 
   const bestPerSlot = {};
 
-  TIME_SLOTS.forEach((slot) => {
+  selectedTimeSlots().forEach((slot) => {
     const values =
       rows
         .map(
@@ -1104,6 +1465,46 @@ function renderTimeComparison() {
         ? Math.min(...values)
         : null;
   });
+
+  el.timeCompareHeadRow.replaceChildren();
+
+  const candidateHead =
+    document.createElement("th");
+
+  candidateHead.textContent =
+    "候補";
+
+  el.timeCompareHeadRow.appendChild(
+    candidateHead
+  );
+
+  selectedTimeSlots().forEach(
+    (slot) => {
+      const th =
+        document.createElement("th");
+
+      th.textContent =
+        slot.label;
+
+      el.timeCompareHeadRow.appendChild(
+        th
+      );
+    }
+  );
+
+  ["平均", "最大", "ブレ"].forEach(
+    (label) => {
+      const th =
+        document.createElement("th");
+
+      th.textContent =
+        label;
+
+      el.timeCompareHeadRow.appendChild(
+        th
+      );
+    }
+  );
 
   el.timeCompareBody.replaceChildren();
 
@@ -1134,7 +1535,7 @@ function renderTimeComparison() {
     nameCell.appendChild(nameSpan);
     tr.appendChild(nameCell);
 
-    TIME_SLOTS.forEach((slot) => {
+    selectedTimeSlots().forEach((slot) => {
       const td =
         document.createElement("td");
 
@@ -1237,7 +1638,7 @@ function renderTimeComparison() {
   if (bestRow) {
     el.timeCompareSummary.textContent =
       `平均所要時間が最短なのは「${bestRow.name}」で約${comparisonMinutes(bestRow.stats.averageMillis)}分。` +
-      ` 最長時は約${comparisonMinutes(bestRow.stats.maxMillis)}分、時間帯によるブレは約${Math.round(bestRow.stats.spreadMillis / 60000)}分です。`;
+      ` 最長時は約${comparisonMinutes(bestRow.stats.maxMillis)}分、選択した時間帯によるブレは約${Math.round(bestRow.stats.spreadMillis / 60000)}分です。`;
   } else {
     el.timeCompareSummary.textContent =
       "時間帯比較の結果を取得できませんでした。";
@@ -1441,9 +1842,12 @@ async function runTimeComparison() {
       baseDate
     );
 
+  const slots =
+    selectedTimeSlots();
+
   const maxRequests =
     state.candidates.length *
-    TIME_SLOTS.length;
+    slots.length;
 
   el.runTimeCompareButton.disabled =
     true;
@@ -1454,7 +1858,7 @@ async function runTimeComparison() {
   );
 
   el.timeCompareStatus.textContent =
-    `時間帯比較を実行中… 最大${maxRequests}回の経路計算です。`;
+    `時間帯比較を実行中… ${slots.length}時間帯・最大${maxRequests}回の経路計算です。`;
 
   const rows =
     state.candidates.map(
@@ -1469,7 +1873,7 @@ async function runTimeComparison() {
   const jobs = [];
 
   rows.forEach((row) => {
-    TIME_SLOTS.forEach((slot) => {
+    slots.forEach((slot) => {
       jobs.push({
         row,
         slot,
@@ -1557,7 +1961,7 @@ async function runTimeComparison() {
       rows.reduce(
         (sum, row) =>
           sum +
-          TIME_SLOTS.filter(
+          slots.filter(
             (slot) =>
               !Number.isFinite(
                 row.times[slot.key]
@@ -2018,12 +2422,67 @@ function bindEvents() {
 
       state.candidates = [];
       persistCandidates();
+      clearTimeComparison();
       renderCandidates();
 
       setStatus(
         "候補をすべて削除しました。"
       );
     }
+  );
+
+  el.addTimeSlotButton.addEventListener(
+    "click",
+    () => {
+      if (
+        activeTimeSlots.length >= 3
+      ) {
+        return;
+      }
+
+      const commonTimes = [
+        "07:00",
+        "07:30",
+        "08:00",
+        "08:30",
+        "09:00",
+        "17:30",
+        "18:00",
+        "18:30",
+        "19:00"
+      ];
+
+      const nextValue =
+        commonTimes.find(
+          (value) =>
+            !activeTimeSlots.some(
+              (slot) =>
+                slot.value === value
+            )
+        ) || "12:00";
+
+      activeTimeSlots.push(
+        slotFromValue(
+          nextValue
+        )
+      );
+
+      sortActiveTimeSlots();
+      persistTimeSlotSettings();
+
+      clearTimeComparison();
+      renderTimeSlotSettings();
+      updateTimeCompareControls();
+
+      setTimeCompareStatus(
+        "比較時刻を追加しました。時刻欄から自由に変更できます。"
+      );
+    }
+  );
+
+  el.resetTimeSlotsButton.addEventListener(
+    "click",
+    resetTimeSlots
   );
 
   el.runTimeCompareButton.addEventListener(
@@ -2131,8 +2590,10 @@ async function init() {
     el.customDateTime.min = toDateTimeLocalValue(new Date(Date.now() + 60000));
 
     loadCandidates();
+    loadTimeSlotSettings();
     loadTimeComparison();
 
+    renderTimeSlotSettings();
     renderCandidates();
     renderTimeComparison();
 

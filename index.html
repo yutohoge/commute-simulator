@@ -12,7 +12,7 @@
 <body>
   <header class="app-header">
     <div>
-      <p class="eyebrow">COMMUTE SIMULATOR v1.2</p>
+      <p class="eyebrow">COMMUTE SIMULATOR v1.2.1</p>
       <h1>通勤・移動時間シミュレーター</h1>
     </div>
     <button id="resetButton" class="subtle-button" type="button">初期化</button>
@@ -157,14 +157,36 @@
         </p>
 
         <div id="timeCompareEmpty" class="time-compare-empty">
-          候補を1件以上追加すると、次の平日の 7:30 / 8:00 / 18:00 を一括比較できます。
+          候補を1件以上追加すると、次の平日の複数時刻を一括比較できます。デフォルトは 7:30 / 8:00 / 18:00 です。
         </div>
 
         <div id="timeCompareControls" class="time-compare-controls hidden">
+          <details id="timeSlotSettings" class="time-slot-settings">
+            <summary>比較時刻を変更</summary>
+
+            <div class="time-slot-settings-body">
+              <p class="time-slot-help">
+                1〜3個の時刻を設定できます。デフォルトは 7:30 / 8:00 / 18:00 です。
+              </p>
+
+              <div id="timeSlotInputs" class="time-slot-inputs"></div>
+
+              <div class="time-slot-actions">
+                <button id="addTimeSlotButton" class="time-slot-secondary-button" type="button">
+                  ＋ 時刻を追加
+                </button>
+
+                <button id="resetTimeSlotsButton" class="time-slot-secondary-button" type="button">
+                  デフォルトに戻す
+                </button>
+              </div>
+            </div>
+          </details>
+
           <div id="timeCompareApiEstimate" class="time-compare-api-estimate"></div>
 
           <button id="runTimeCompareButton" class="time-compare-run-button" type="button">
-            3時間帯を一括比較
+            時間帯を一括比較
           </button>
 
           <p class="time-compare-note">
@@ -178,14 +200,8 @@
           <div class="time-compare-table-wrap">
             <table class="time-compare-table">
               <thead>
-                <tr>
+                <tr id="timeCompareHeadRow">
                   <th>候補</th>
-                  <th>7:30</th>
-                  <th>8:00</th>
-                  <th>18:00</th>
-                  <th>平均</th>
-                  <th>最大</th>
-                  <th>ブレ</th>
                 </tr>
               </thead>
               <tbody id="timeCompareBody"></tbody>

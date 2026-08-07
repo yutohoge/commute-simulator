@@ -768,3 +768,111 @@ details { margin-top: 15px; color: var(--muted); font-size: .76rem; line-height:
   font-size: .75rem;
   line-height: 1.5;
 }
+
+
+/* =========================================================
+   Custom time slots - v1.2.1
+========================================================= */
+
+.time-slot-settings {
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.time-slot-settings > summary {
+  padding: 10px 11px;
+  color: #31557b;
+  font-size: .76rem;
+  font-weight: 800;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.time-slot-settings-body {
+  padding: 0 11px 11px;
+}
+
+.time-slot-help {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: .7rem;
+  line-height: 1.45;
+}
+
+.time-slot-inputs {
+  display: grid;
+  gap: 7px;
+}
+
+.time-slot-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.time-slot-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #526174;
+  font-size: .68rem;
+  font-weight: 850;
+}
+
+.time-slot-input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: white;
+  color: #253247;
+}
+
+.time-slot-remove-button {
+  min-width: 54px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid #ead2cf;
+  border-radius: 9px;
+  background: #fff8f7;
+  color: #9d3028;
+  font-size: .7rem;
+  font-weight: 750;
+}
+
+.time-slot-remove-button:disabled,
+.time-slot-secondary-button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.time-slot-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.time-slot-secondary-button {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #f8fbff;
+  color: #31557b;
+  font-size: .7rem;
+  font-weight: 750;
+}
+
+@media (max-width: 760px) {
+  .time-slot-actions {
+    grid-template-columns: 1fr;
+  }
+}
