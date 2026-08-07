@@ -651,10 +651,16 @@ const NEARBY_SEARCH_GROUPS = [
     ]
   },
   {
-    key: "transit",
-    label: "交通施設",
+    key: "rail",
+    label: "電車・地下鉄駅",
     categoryKeys: [
-      "railStation",
+      "railStation"
+    ]
+  },
+  {
+    key: "bus",
+    label: "バス停",
+    categoryKeys: [
       "busStop"
     ]
   }
@@ -1217,7 +1223,10 @@ function nearbyDataIsCurrent(nearby) {
       "life"
     ) &&
     nearby.searchGroups.includes(
-      "transit"
+      "rail"
+    ) &&
+    nearby.searchGroups.includes(
+      "bus"
     )
   );
 }
@@ -1263,7 +1272,7 @@ function renderCandidateNearbyPanel(
       "nearby-search-intro";
 
     intro.textContent =
-      `周辺検索を1.5km・2分割検索へ更新しました。旧${(
+      `周辺検索を1.5km・3分割検索へ更新しました。旧${(
         nearby.radiusMeters /
         1000
       ).toFixed(1)}km / 旧検索方式の結果は総合スコアには使用しません。再検索してください。`;
@@ -1280,7 +1289,7 @@ function renderCandidateNearbyPanel(
       "nearby-search-button";
 
     button.textContent =
-      "1.5kmで周辺施設を再検索（Places API 2回）";
+      "1.5kmで周辺施設を再検索（Places API 3回）";
 
     button.addEventListener(
       "click",
@@ -1348,7 +1357,7 @@ function renderCandidateNearbyPanel(
       "nearby-search-button";
 
     button.textContent =
-      "周辺施設を検索（Places API 2回）";
+      "周辺施設を検索（Places API 3回）";
 
     button.addEventListener(
       "click",
@@ -1539,7 +1548,7 @@ function renderCandidateNearbyPanel(
     "nearby-search-button";
 
   refreshButton.textContent =
-    "周辺施設を再検索（Places API 2回）";
+    "周辺施設を再検索（Places API 3回）";
 
   refreshButton.addEventListener(
     "click",
@@ -3247,11 +3256,15 @@ function candidateTotalScore(
 function candidateLocationMapsUrl(
   candidate
 ) {
+  const hasAddress =
+    typeof candidate.originAddress ===
+      "string" &&
+    candidate.originAddress.trim() !== "";
+
   const query =
-    candidate.originAddress ||
-    candidate.originLabel ||
-    candidate.name ||
-    `${candidate.origin.lat},${candidate.origin.lng}`;
+    hasAddress
+      ? candidate.originAddress.trim()
+      : `${candidate.origin.lat},${candidate.origin.lng}`;
 
   const params =
     new URLSearchParams({

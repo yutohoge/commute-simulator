@@ -12,7 +12,7 @@
 <body>
   <header class="app-header">
     <div>
-      <p class="eyebrow">COMMUTE SIMULATOR v2.2.1</p>
+      <p class="eyebrow">COMMUTE SIMULATOR v2.2.2</p>
       <h1>通勤・移動時間シミュレーター</h1>
     </div>
     <button id="resetButton" class="subtle-button" type="button">初期化</button>
@@ -338,7 +338,7 @@
         <p>「交通状況による補正」は、交通状況を考慮した所要時間と、同じルートを交通状況なしで走る場合の所要時間との差です。</p>
         <p>「公共交通をGoogleマップで見る」はGoogle Maps本体を開くリンクで、Routes APIの公共交通検索は使用しません。</p>
         <p>周辺施設は候補カードの「周辺施設を検索」を押したときだけPlaces API (New) のNearby Searchを1回実行します。電車・地下鉄駅とバス停は別カテゴリで表示します。結果の表示だけでは追加のPlaces APIリクエストは発生しません。</p>
-        <p>周辺施設は候補地点から1.5km圏内を検索し、生活施設と交通施設に分けてNearby Searchを2回実行します。距離は直線距離で表示します。徒歩ルートの距離ではありません。総合スコアの計算だけではAPIを呼びません。</p>
+        <p>周辺施設は候補地点から1.5km圏内を検索し、生活施設・電車/地下鉄駅・バス停に分けてNearby Searchを3回実行します。距離は直線距離で表示します。徒歩ルートの距離ではありません。総合スコアの計算だけではAPIを呼びません。</p>
       </details>
     </section>
   </main>
