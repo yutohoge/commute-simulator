@@ -275,6 +275,506 @@ function restoreDefaultDestination() {
   }
 }
 
+
+/* =========================================================
+   Candidate comparison - v1.1.1
+========================================================= */
+
+const CANDIDATE_STORAGE_KEY = "commuteSimulatorCandidatesV1_1";
+const MAX_CANDIDATES = 12;
+
+function safeSessionStorageGet(key) {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSessionStorageSet(key, value) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // sessionStorageが使えない場合でも、メモリ上では動作を継続する
+  }
+}
+
+function loadCandidates() {
+  const raw = safeSessionStorageGet(CANDIDATE_STORAGE_KEY);
+
+  if (!raw) {
+    state.candidates = [];
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    state.candidates = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    state.candidates = [];
+  }
+}
+
+function persistCandidates() {
+  safeSessionStorageSet(
+    CANDIDATE_STORAGE_KEY,
+    JSON.stringify(state.candidates)
+  );
+}
+
+function currentDrivingResult() {
+  return (
+    state.lastResults.find(
+      (item) => item.mode === "DRIVING"
+    ) || null
+  );
+}
+
+function candidateDurationText(milliseconds) {
+  return durationText(milliseconds);
+}
+
+function candidateDepartureLabel(date) {
+  return formatDateTime(date);
+}
+
+function currentConditionSignature() {
+  const destination = state.destination.location;
+
+  return JSON.stringify({
+    destinationLat: Number(destination.lat).toFixed(5),
+    destinationLng: Number(destination.lng).toFixed(5),
+    destinationLabel: state.destination.label,
+    preset: state.preset,
+    customDateTime:
+      state.preset === "CUSTOM"
+        ? el.customDateTime.value
+        : "",
+    avoidTolls: el.avoidTolls.checked,
+    avoidHighways: el.avoidHighways.checked,
+    avoidFerries: el.avoidFerries.checked
+  });
+}
+
+function currentConditionLabel() {
+  let timeLabel = "現在";
+
+  if (state.preset === "WEEKDAY_0730") {
+    timeLabel = "平日 7:30";
+  } else if (state.preset === "WEEKDAY_0800") {
+    timeLabel = "平日 8:00";
+  } else if (state.preset === "WEEKDAY_1800") {
+    timeLabel = "平日 18:00";
+  } else if (
+    state.preset === "CUSTOM" &&
+    el.customDateTime.value
+  ) {
+    timeLabel = new Intl.DateTimeFormat(
+      "ja-JP",
+      {
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      }
+    ).format(
+      new Date(el.customDateTime.value)
+    );
+  }
+
+  const routeOptions = [];
+
+  if (el.avoidTolls.checked) {
+    routeOptions.push("有料道路回避");
+  }
+
+  if (el.avoidHighways.checked) {
+    routeOptions.push("高速回避");
+  }
+
+  if (el.avoidFerries.checked) {
+    routeOptions.push("フェリー回避");
+  }
+
+  return [
+    state.destination.label,
+    timeLabel,
+    routeOptions.length
+      ? routeOptions.join("・")
+      : "標準ルート"
+  ].join(" / ");
+}
+
+function genericOriginLabel(label) {
+  return [
+    "地図で選択した出発地",
+    "ピンを移動した出発地",
+    "現在地"
+  ].includes(label);
+}
+
+function suggestedCandidateName() {
+  if (
+    state.originLabel &&
+    !genericOriginLabel(state.originLabel)
+  ) {
+    return state.originLabel;
+  }
+
+  return `候補${state.candidates.length + 1}`;
+}
+
+function updateCandidateAddButton() {
+  const driving = currentDrivingResult();
+
+  el.addCandidateButton.classList.toggle(
+    "hidden",
+    !driving || !state.origin
+  );
+}
+
+function trafficIncreaseMinutes(candidate) {
+  if (
+    !Number.isFinite(candidate.durationMillis) ||
+    !Number.isFinite(candidate.staticDurationMillis)
+  ) {
+    return null;
+  }
+
+  return Math.max(
+    0,
+    Math.round(
+      (
+        candidate.durationMillis -
+        candidate.staticDurationMillis
+      ) / 60000
+    )
+  );
+}
+
+function renderCandidates() {
+  const sorted = [...state.candidates].sort(
+    (a, b) =>
+      a.durationMillis -
+      b.durationMillis
+  );
+
+  el.candidateList.replaceChildren();
+
+  el.candidateCount.textContent =
+    `${sorted.length}件`;
+
+  el.candidateEmpty.classList.toggle(
+    "hidden",
+    sorted.length > 0
+  );
+
+  el.clearCandidatesButton.classList.toggle(
+    "hidden",
+    sorted.length === 0
+  );
+
+  const signatures = new Set(
+    sorted.map(
+      (candidate) =>
+        candidate.conditionSignature
+    )
+  );
+
+  if (signatures.size > 1) {
+    el.candidateConditionNotice.textContent =
+      "検索条件が異なる候補が含まれています。時刻・目的地・回避設定を確認して比較してください。";
+
+    el.candidateConditionNotice.classList.remove(
+      "hidden"
+    );
+  } else {
+    el.candidateConditionNotice.classList.add(
+      "hidden"
+    );
+  }
+
+  sorted.forEach(
+    (candidate, index) => {
+      const card =
+        document.createElement("article");
+
+      card.className =
+        `candidate-card${index === 0 ? " best" : ""}`;
+
+      const increase =
+        trafficIncreaseMinutes(candidate);
+
+      card.innerHTML = `
+        <div class="candidate-card-top">
+          <div class="candidate-card-title-wrap">
+            <span class="candidate-rank">${index + 1}</span>
+            ${
+              index === 0
+                ? '<span class="candidate-best-label">最短</span>'
+                : ""
+            }
+            <p class="candidate-name"></p>
+          </div>
+        </div>
+
+        <div class="candidate-duration">
+          ${candidateDurationText(candidate.durationMillis)}
+        </div>
+
+        <div class="candidate-metrics">
+          <div class="candidate-metric">
+            距離<br>
+            <strong>${distanceText(candidate.distanceMeters)}</strong>
+          </div>
+
+          <div class="candidate-metric">
+            渋滞増加<br>
+            <strong>
+              ${
+                increase === null
+                  ? "—"
+                  : increase > 0
+                  ? `+${increase}分`
+                  : "ほぼなし"
+              }
+            </strong>
+          </div>
+        </div>
+
+        <p class="candidate-condition"></p>
+
+        <div class="candidate-actions">
+          <button
+            class="candidate-use-button"
+            type="button">
+            この地点を使う
+          </button>
+
+          <button
+            class="candidate-delete-button"
+            type="button">
+            削除
+          </button>
+        </div>
+      `;
+
+      card
+        .querySelector(".candidate-name")
+        .textContent =
+          candidate.name;
+
+      card
+        .querySelector(".candidate-condition")
+        .textContent =
+          `${candidate.conditionLabel} / 検索 ${candidate.departureLabel}`;
+
+      card
+        .querySelector(".candidate-use-button")
+        .addEventListener(
+          "click",
+          () => {
+            setOrigin(
+              candidate.origin,
+              candidate.name,
+              {
+                clearAutocomplete: true
+              }
+            );
+
+            setMapSelectionTarget(
+              "ORIGIN"
+            );
+
+            setStatus(
+              `「${candidate.name}」を出発地に設定しました。必要ならもう一度検索してください。`
+            );
+          }
+        );
+
+      card
+        .querySelector(".candidate-delete-button")
+        .addEventListener(
+          "click",
+          () => {
+            state.candidates =
+              state.candidates.filter(
+                (item) =>
+                  item.id !== candidate.id
+              );
+
+            persistCandidates();
+            renderCandidates();
+          }
+        );
+
+      el.candidateList.appendChild(
+        card
+      );
+    }
+  );
+}
+
+function openCandidateDialog() {
+  const driving =
+    currentDrivingResult();
+
+  if (!driving || !state.origin) {
+    return;
+  }
+
+  if (
+    state.candidates.length >=
+    MAX_CANDIDATES
+  ) {
+    setStatus(
+      `候補は最大${MAX_CANDIDATES}件までです。不要な候補を削除してください。`,
+      "error"
+    );
+
+    return;
+  }
+
+  state.pendingCandidate = {
+    driving,
+    conditionSignature:
+      currentConditionSignature(),
+    conditionLabel:
+      currentConditionLabel()
+  };
+
+  el.candidateNameInput.value =
+    suggestedCandidateName();
+
+  el.candidateDialogSummary.textContent =
+    `${candidateDurationText(driving.route.durationMillis)} / ` +
+    `${distanceText(driving.route.distanceMeters)} / ` +
+    `${state.destination.label}まで`;
+
+  el.candidateDialog.showModal();
+
+  requestAnimationFrame(() => {
+    el.candidateNameInput.focus();
+    el.candidateNameInput.select();
+  });
+}
+
+function closeCandidateDialog() {
+  state.pendingCandidate = null;
+
+  if (el.candidateDialog.open) {
+    el.candidateDialog.close();
+  }
+}
+
+function savePendingCandidate() {
+  if (
+    !state.pendingCandidate ||
+    !state.origin
+  ) {
+    return;
+  }
+
+  const name =
+    el.candidateNameInput.value.trim();
+
+  if (!name) {
+    el.candidateNameInput.focus();
+    return;
+  }
+
+  const {
+    driving,
+    conditionSignature,
+    conditionLabel
+  } = state.pendingCandidate;
+
+  const candidate = {
+    id:
+      globalThis.crypto?.randomUUID?.() ||
+      `${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}`,
+
+    name,
+
+    origin: {
+      lat: state.origin.lat,
+      lng: state.origin.lng
+    },
+
+    destination: {
+      label: state.destination.label,
+      location: {
+        lat: state.destination.location.lat,
+        lng: state.destination.location.lng
+      }
+    },
+
+    durationMillis:
+      driving.route.durationMillis,
+
+    staticDurationMillis:
+      driving.route.staticDurationMillis,
+
+    distanceMeters:
+      driving.route.distanceMeters,
+
+    departureTime:
+      driving.departureTime.toISOString(),
+
+    departureLabel:
+      candidateDepartureLabel(
+        driving.departureTime
+      ),
+
+    conditionSignature,
+    conditionLabel,
+
+    createdAt:
+      new Date().toISOString()
+  };
+
+  const duplicateIndex =
+    state.candidates.findIndex(
+      (existing) =>
+        Math.abs(
+          existing.origin.lat -
+          candidate.origin.lat
+        ) < 0.00001 &&
+        Math.abs(
+          existing.origin.lng -
+          candidate.origin.lng
+        ) < 0.00001 &&
+        existing.conditionSignature ===
+        candidate.conditionSignature
+    );
+
+  if (duplicateIndex >= 0) {
+    candidate.id =
+      state.candidates[
+        duplicateIndex
+      ].id;
+
+    state.candidates[
+      duplicateIndex
+    ] = candidate;
+  } else {
+    state.candidates.push(
+      candidate
+    );
+  }
+
+  persistCandidates();
+  renderCandidates();
+  closeCandidateDialog();
+
+  setStatus(
+    `「${name}」を候補に追加しました。`
+  );
+}
+
+
 async function createAutocomplete(host, placeholder, onSelect) {
   const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
 
@@ -515,6 +1015,7 @@ async function searchRoutes() {
 
     state.lastResults = results;
     renderResults(results);
+    updateCandidateAddButton();
 
     const routeToDraw = results.reduce((best, item) => {
       if (!best) return item;
@@ -648,6 +1149,58 @@ function bindEvents() {
   el.defaultDestinationButton.addEventListener("click", restoreDefaultDestination);
   el.resetButton.addEventListener("click", resetApp);
   el.openGoogleMapsButton.addEventListener("click", openGoogleMaps);
+
+  el.addCandidateButton.addEventListener(
+    "click",
+    openCandidateDialog
+  );
+
+  el.candidateForm.addEventListener(
+    "submit",
+    (event) => {
+      event.preventDefault();
+      savePendingCandidate();
+    }
+  );
+
+  el.candidateCancelButton.addEventListener(
+    "click",
+    closeCandidateDialog
+  );
+
+  el.candidateDialogClose.addEventListener(
+    "click",
+    closeCandidateDialog
+  );
+
+  el.candidateDialog.addEventListener(
+    "cancel",
+    (event) => {
+      event.preventDefault();
+      closeCandidateDialog();
+    }
+  );
+
+  el.clearCandidatesButton.addEventListener(
+    "click",
+    () => {
+      if (
+        !confirm(
+          "このタブ内の候補をすべて削除しますか？"
+        )
+      ) {
+        return;
+      }
+
+      state.candidates = [];
+      persistCandidates();
+      renderCandidates();
+
+      setStatus(
+        "候補をすべて削除しました。"
+      );
+    }
+  );
 
   el.currentLocationButton.addEventListener("click", () => {
     if (!navigator.geolocation) {
