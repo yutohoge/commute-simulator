@@ -12,7 +12,7 @@
 <body>
   <header class="app-header">
     <div>
-      <p class="eyebrow">COMMUTE SIMULATOR v2.2.2</p>
+      <p class="eyebrow">COMMUTE SIMULATOR v2.3</p>
       <h1>通勤・移動時間シミュレーター</h1>
     </div>
     <button id="resetButton" class="subtle-button" type="button">初期化</button>
@@ -433,6 +433,35 @@
         すべて任意入力です。空欄のままでも候補地比較はそのまま使えます。
       </p>
 
+      <section class="suumo-import-section" aria-label="SUUMOスクショ取り込み">
+        <div class="suumo-import-header">
+          <div>
+            <p class="eyebrow">SUUMO SCREENSHOT</p>
+            <strong>SUUMOスクショから入力</strong>
+          </div>
+
+          <button id="suumoScreenshotButton" class="suumo-import-button" type="button">
+            スクショを選ぶ
+          </button>
+        </div>
+
+        <input id="suumoScreenshotInput" class="hidden" type="file" accept="image/*">
+
+        <p class="suumo-import-note">
+          スクショを端末内でOCRし、読み取れた項目をこのフォームへ反映します。即保存はしないので、内容を確認・修正してから保存してください。
+        </p>
+
+        <div id="suumoOcrStatus" class="suumo-ocr-status hidden" aria-live="polite">
+          <div class="suumo-ocr-status-row">
+            <span id="suumoOcrStatusText">OCRを準備中…</span>
+            <span id="suumoOcrPercent">0%</span>
+          </div>
+          <progress id="suumoOcrProgress" max="100" value="0"></progress>
+        </div>
+
+        <div id="suumoOcrSummary" class="suumo-ocr-summary hidden"></div>
+      </section>
+
       <div class="profile-form-grid">
         <label class="profile-field">
           <span>家賃</span>
@@ -513,6 +542,19 @@
             <span>分</span>
           </div>
         </label>
+
+        <section id="profileStationAccessSection" class="profile-field profile-field-wide station-access-section hidden">
+          <div class="station-access-title">
+            <span>駅アクセス</span>
+            <small>評価に使うアクセスを選択</small>
+          </div>
+
+          <div id="profileStationAccessList" class="station-access-list"></div>
+
+          <p class="station-access-note">
+            SUUMOスクショから複数路線を読み取った場合はすべて保持します。初期状態では徒歩時間が最短のアクセスを選択します。「手入力」を選ぶと上の駅徒歩欄を評価に使います。
+          </p>
+        </section>
 
         <label class="profile-field profile-field-wide">
           <span>駐車場</span>

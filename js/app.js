@@ -27,6 +27,9 @@ const state = {
   candidates: [],
   pendingCandidate: null,
   editingProfileCandidateId: null,
+  editingStationAccesses: [],
+  editingStationAccessSelection: "manual",
+  suumoOcrBusy: false,
   timeComparison: null
 };
 
@@ -98,6 +101,16 @@ const el = {
   profileParking: document.getElementById("profileParking"),
   profileMemo: document.getElementById("profileMemo"),
   profileCalculationPreview: document.getElementById("profileCalculationPreview"),
+
+  suumoScreenshotButton: document.getElementById("suumoScreenshotButton"),
+  suumoScreenshotInput: document.getElementById("suumoScreenshotInput"),
+  suumoOcrStatus: document.getElementById("suumoOcrStatus"),
+  suumoOcrStatusText: document.getElementById("suumoOcrStatusText"),
+  suumoOcrPercent: document.getElementById("suumoOcrPercent"),
+  suumoOcrProgress: document.getElementById("suumoOcrProgress"),
+  suumoOcrSummary: document.getElementById("suumoOcrSummary"),
+  profileStationAccessSection: document.getElementById("profileStationAccessSection"),
+  profileStationAccessList: document.getElementById("profileStationAccessList"),
 
   timeCompareDate: document.getElementById("timeCompareDate"),
   timeCompareEmpty: document.getElementById("timeCompareEmpty"),
@@ -1566,6 +1579,945 @@ function renderCandidateNearbyPanel(
   );
 }
 
+
+const TESSERACT_CDN_URLS = [
+  "https://cdn.jsdelivr.net/npm/tesseract.js@7/dist/tesseract.min.js",
+  "https://unpkg.com/tesseract.js@7/dist/tesseract.min.js"
+];
+
+let tesseractLoadPromise = null;
+
+function simpleIdPart(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^a-z0-9ぁ-んァ-ヶ一-龠ー]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}
+
+function normalizeStationAccess(access, index = 0) {
+  if (
+    !access ||
+    typeof access !== "object"
+  ) {
+    return null;
+  }
+
+  const walkMinutes =
+    Number(access.walkMinutes);
+
+  if (
+    !Number.isFinite(walkMinutes) ||
+    walkMinutes < 0
+  ) {
+    return null;
+  }
+
+  const route =
+    typeof access.route === "string"
+      ? access.route.trim()
+      : "";
+
+  const station =
+    typeof access.station === "string"
+      ? access.station.trim()
+      : "";
+
+  if (!station) {
+    return null;
+  }
+
+  const fallbackId =
+    `access-${simpleIdPart(route)}-${simpleIdPart(station)}-${Math.round(walkMinutes)}-${index}`;
+
+  return {
+    id:
+      typeof access.id === "string" &&
+      access.id.trim()
+        ? access.id.trim()
+        : fallbackId,
+
+    route,
+    station,
+    walkMinutes:
+      Math.round(walkMinutes)
+  };
+}
+
+function normalizeStationAccesses(accesses) {
+  if (!Array.isArray(accesses)) {
+    return [];
+  }
+
+  const normalized =
+    accesses
+      .map(normalizeStationAccess)
+      .filter(Boolean);
+
+  const seen = new Set();
+
+  return normalized.filter(
+    (access) => {
+      const key =
+        `${access.route}|${access.station}|${access.walkMinutes}`;
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    }
+  );
+}
+
+function shortestStationAccessId(accesses) {
+  if (!accesses.length) {
+    return "manual";
+  }
+
+  return [...accesses]
+    .sort(
+      (a, b) =>
+        a.walkMinutes -
+        b.walkMinutes
+    )[0].id;
+}
+
+function selectedStationAccess(
+  accesses,
+  selection
+) {
+  if (selection === "manual") {
+    return null;
+  }
+
+  return accesses.find(
+    (access) =>
+      access.id === selection
+  ) || null;
+}
+
+function renderStationAccessOptions() {
+  const accesses =
+    normalizeStationAccesses(
+      state.editingStationAccesses
+    );
+
+  state.editingStationAccesses =
+    accesses;
+
+  const show =
+    accesses.length > 0;
+
+  el.profileStationAccessSection.classList.toggle(
+    "hidden",
+    !show
+  );
+
+  el.profileStationAccessList.replaceChildren();
+
+  if (!show) {
+    state.editingStationAccessSelection =
+      "manual";
+    return;
+  }
+
+  const validSelection =
+    state.editingStationAccessSelection === "manual" ||
+    accesses.some(
+      (access) =>
+        access.id ===
+        state.editingStationAccessSelection
+    );
+
+  if (!validSelection) {
+    state.editingStationAccessSelection =
+      shortestStationAccessId(
+        accesses
+      );
+  }
+
+  accesses.forEach(
+    (access) => {
+      const label =
+        document.createElement("label");
+
+      label.className =
+        "station-access-option";
+
+      const radio =
+        document.createElement("input");
+
+      radio.type = "radio";
+      radio.name =
+        "profileStationAccessSelection";
+      radio.value =
+        access.id;
+      radio.checked =
+        state.editingStationAccessSelection ===
+        access.id;
+
+      radio.addEventListener(
+        "change",
+        () => {
+          if (!radio.checked) {
+            return;
+          }
+
+          state.editingStationAccessSelection =
+            access.id;
+
+          el.profileStationWalk.value =
+            access.walkMinutes;
+
+          updateProfileCalculationPreview();
+        }
+      );
+
+      const main =
+        document.createElement("div");
+
+      main.className =
+        "station-access-main";
+
+      const title =
+        document.createElement("strong");
+
+      title.textContent =
+        access.route
+          ? `${access.route}｜${access.station}`
+          : access.station;
+
+      const detail =
+        document.createElement("span");
+
+      detail.textContent =
+        `徒歩${access.walkMinutes}分`;
+
+      main.append(
+        title,
+        detail
+      );
+
+      label.append(
+        radio,
+        main
+      );
+
+      el.profileStationAccessList.appendChild(
+        label
+      );
+    }
+  );
+
+  const manualLabel =
+    document.createElement("label");
+
+  manualLabel.className =
+    "station-access-option";
+
+  const manualRadio =
+    document.createElement("input");
+
+  manualRadio.type = "radio";
+  manualRadio.name =
+    "profileStationAccessSelection";
+  manualRadio.value =
+    "manual";
+  manualRadio.checked =
+    state.editingStationAccessSelection ===
+    "manual";
+
+  manualRadio.addEventListener(
+    "change",
+    () => {
+      if (manualRadio.checked) {
+        state.editingStationAccessSelection =
+          "manual";
+      }
+    }
+  );
+
+  const manualMain =
+    document.createElement("div");
+
+  manualMain.className =
+    "station-access-main";
+
+  const manualTitle =
+    document.createElement("strong");
+
+  manualTitle.textContent =
+    "手入力を使う";
+
+  const manualDetail =
+    document.createElement("span");
+
+  manualDetail.textContent =
+    "上の「駅徒歩」欄の値を総合スコアに使用";
+
+  manualMain.append(
+    manualTitle,
+    manualDetail
+  );
+
+  manualLabel.append(
+    manualRadio,
+    manualMain
+  );
+
+  el.profileStationAccessList.appendChild(
+    manualLabel
+  );
+}
+
+function loadScript(src) {
+  return new Promise(
+    (resolve, reject) => {
+      const existing =
+        [...document.scripts].find(
+          (script) =>
+            script.src === src
+        );
+
+      if (existing) {
+        if (window.Tesseract) {
+          resolve();
+          return;
+        }
+
+        existing.addEventListener(
+          "load",
+          resolve,
+          { once: true }
+        );
+
+        existing.addEventListener(
+          "error",
+          reject,
+          { once: true }
+        );
+
+        return;
+      }
+
+      const script =
+        document.createElement("script");
+
+      script.src = src;
+      script.async = true;
+
+      script.addEventListener(
+        "load",
+        resolve,
+        { once: true }
+      );
+
+      script.addEventListener(
+        "error",
+        () =>
+          reject(
+            new Error(
+              `OCRライブラリを読み込めませんでした: ${src}`
+            )
+          ),
+        { once: true }
+      );
+
+      document.head.appendChild(
+        script
+      );
+    }
+  );
+}
+
+async function ensureTesseractLoaded() {
+  if (window.Tesseract) {
+    return window.Tesseract;
+  }
+
+  if (tesseractLoadPromise) {
+    return tesseractLoadPromise;
+  }
+
+  tesseractLoadPromise =
+    (async () => {
+      let lastError = null;
+
+      for (
+        const url of
+        TESSERACT_CDN_URLS
+      ) {
+        try {
+          await loadScript(url);
+
+          if (window.Tesseract) {
+            return window.Tesseract;
+          }
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw (
+        lastError ||
+        new Error(
+          "OCRライブラリを読み込めませんでした。"
+        )
+      );
+    })();
+
+  try {
+    return await tesseractLoadPromise;
+  } catch (error) {
+    tesseractLoadPromise = null;
+    throw error;
+  }
+}
+
+function updateSuumoOcrProgress(
+  message,
+  percent
+) {
+  const safePercent =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(
+          Number(percent) || 0
+        )
+      )
+    );
+
+  el.suumoOcrStatus.classList.remove(
+    "hidden"
+  );
+
+  el.suumoOcrStatusText.textContent =
+    message;
+
+  el.suumoOcrPercent.textContent =
+    `${safePercent}%`;
+
+  el.suumoOcrProgress.value =
+    safePercent;
+}
+
+function setSuumoOcrSummary(
+  message,
+  tone = "success"
+) {
+  el.suumoOcrSummary.textContent =
+    message;
+
+  el.suumoOcrSummary.className =
+    "suumo-ocr-summary";
+
+  if (tone !== "success") {
+    el.suumoOcrSummary.classList.add(
+      tone
+    );
+  }
+
+  el.suumoOcrSummary.classList.remove(
+    "hidden"
+  );
+}
+
+function normalizeOcrText(text) {
+  return String(text || "")
+    .normalize("NFKC")
+    .replace(/\r/g, "\n")
+    .replace(/[|｜]/g, " ")
+    .replace(/[／]/g, "/")
+    .replace(/[：]/g, ":")
+    .replace(/[，]/g, ",")
+    .replace(/[．]/g, ".")
+    .replace(/[㎡]/g, "m2")
+    .replace(/[²]/g, "2")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
+function firstRegexNumber(
+  text,
+  regex,
+  min,
+  max
+) {
+  const match =
+    regex.exec(text);
+
+  if (!match) {
+    return null;
+  }
+
+  const value =
+    Number(
+      String(match[1])
+        .replace(/,/g, "")
+    );
+
+  if (
+    !Number.isFinite(value) ||
+    value < min ||
+    value > max
+  ) {
+    return null;
+  }
+
+  return value;
+}
+
+function parseStationAccessesFromText(
+  normalizedText
+) {
+  const lines =
+    normalizedText
+      .split("\n")
+      .map(
+        (line) =>
+          line.trim()
+      )
+      .filter(Boolean);
+
+  const results = [];
+
+  const addMatch =
+    (
+      route,
+      station,
+      walkMinutes
+    ) => {
+      const minutes =
+        Number(walkMinutes);
+
+      if (
+        !Number.isFinite(minutes) ||
+        minutes < 0 ||
+        minutes > 60 ||
+        !String(station).includes("駅")
+      ) {
+        return;
+      }
+
+      results.push({
+        route:
+          String(route || "")
+            .replace(
+              /^[・●◆■□◇▶▷\-\s]+/,
+              ""
+            )
+            .trim(),
+
+        station:
+          String(station || "")
+            .trim(),
+
+        walkMinutes:
+          Math.round(minutes)
+      });
+    };
+
+  lines.forEach(
+    (line) => {
+      if (
+        !line.includes("駅") ||
+        !/(徒歩|歩)\s*\d{1,2}\s*分/.test(
+          line
+        )
+      ) {
+        return;
+      }
+
+      let match =
+        /(.{1,50}?)\/\s*([^\/\s]{1,24}駅)\s*(?:徒歩|歩)\s*(\d{1,2})\s*分/.exec(
+          line
+        );
+
+      if (match) {
+        addMatch(
+          match[1],
+          match[2],
+          match[3]
+        );
+        return;
+      }
+
+      match =
+        /(.{1,50}?)\s+([^\s]{1,24}駅)\s*(?:徒歩|歩)\s*(\d{1,2})\s*分/.exec(
+          line
+        );
+
+      if (match) {
+        addMatch(
+          match[1],
+          match[2],
+          match[3]
+        );
+        return;
+      }
+
+      match =
+        /([^\s\/]{1,24}駅)\s*(?:徒歩|歩)\s*(\d{1,2})\s*分/.exec(
+          line
+        );
+
+      if (match) {
+        addMatch(
+          "",
+          match[1],
+          match[2]
+        );
+      }
+    }
+  );
+
+  return normalizeStationAccesses(
+    results
+  );
+}
+
+function parseSuumoOcrText(rawText) {
+  const text =
+    normalizeOcrText(
+      rawText
+    );
+
+  const rentManYen =
+    firstRegexNumber(
+      text,
+      /(?:^|\n|\s)(\d{1,3}(?:\.\d{1,2})?)\s*万円(?=\s|$|\(|（)/m,
+      1,
+      200
+    );
+
+  const managementFeeYen =
+    firstRegexNumber(
+      text,
+      /(?:管理費(?:・共益費)?|共益費)\s*:?\s*([\d,]{1,10})\s*円/,
+      0,
+      1000000
+    );
+
+  const areaSqm =
+    firstRegexNumber(
+      text,
+      /(\d{1,3}(?:\.\d{1,2})?)\s*(?:m2|m\^?2)/i,
+      5,
+      500
+    );
+
+  const layoutMatch =
+    /\b(\d{1,2}\s*(?:SLDK|LDK|SDK|DK|SK|K|R))\b/i.exec(
+      text
+    );
+
+  const buildingAgeYears =
+    firstRegexNumber(
+      text,
+      /築\s*(\d{1,3})\s*年/,
+      0,
+      200
+    );
+
+  let parking =
+    "UNKNOWN";
+
+  const parkingLines =
+    text
+      .split("\n")
+      .filter(
+        (line) =>
+          /駐車場/.test(line) &&
+          !/駐輪場/.test(line)
+      );
+
+  if (
+    parkingLines.some(
+      (line) =>
+        /(なし|無し|無|空無|空きなし)/.test(
+          line
+        )
+    )
+  ) {
+    parking = "NO";
+  } else if (
+    parkingLines.some(
+      (line) =>
+        /(あり|有|空有|空きあり|空車)/.test(
+          line
+        )
+    )
+  ) {
+    parking = "YES";
+  }
+
+  const stationAccesses =
+    parseStationAccessesFromText(
+      text
+    );
+
+  return {
+    rentManYen,
+    managementFeeYen,
+    areaSqm,
+    layout:
+      layoutMatch
+        ? layoutMatch[1]
+            .replace(/\s/g, "")
+            .toUpperCase()
+        : "",
+
+    buildingAgeYears,
+    parking,
+    stationAccesses,
+    rawText: text
+  };
+}
+
+function applySuumoParsedData(parsed) {
+  const applied = [];
+
+  if (
+    Number.isFinite(
+      parsed.rentManYen
+    )
+  ) {
+    el.profileRent.value =
+      parsed.rentManYen;
+    applied.push("家賃");
+  }
+
+  if (
+    Number.isFinite(
+      parsed.managementFeeYen
+    )
+  ) {
+    el.profileManagementFee.value =
+      parsed.managementFeeYen;
+    applied.push("管理・共益費");
+  }
+
+  if (
+    Number.isFinite(
+      parsed.areaSqm
+    )
+  ) {
+    el.profileArea.value =
+      parsed.areaSqm;
+    applied.push("専有面積");
+  }
+
+  if (parsed.layout) {
+    el.profileLayout.value =
+      parsed.layout;
+    applied.push("間取り");
+  }
+
+  if (
+    Number.isFinite(
+      parsed.buildingAgeYears
+    )
+  ) {
+    el.profileBuildingAge.value =
+      parsed.buildingAgeYears;
+    applied.push("築年数");
+  }
+
+  if (
+    parsed.parking !==
+    "UNKNOWN"
+  ) {
+    el.profileParking.value =
+      parsed.parking;
+    applied.push("駐車場");
+  }
+
+  if (
+    parsed.stationAccesses.length
+  ) {
+    state.editingStationAccesses =
+      parsed.stationAccesses;
+
+    state.editingStationAccessSelection =
+      shortestStationAccessId(
+        parsed.stationAccesses
+      );
+
+    const selected =
+      selectedStationAccess(
+        parsed.stationAccesses,
+        state.editingStationAccessSelection
+      );
+
+    if (selected) {
+      el.profileStationWalk.value =
+        selected.walkMinutes;
+    }
+
+    renderStationAccessOptions();
+
+    applied.push(
+      `駅アクセス${parsed.stationAccesses.length}件`
+    );
+  }
+
+  updateProfileCalculationPreview();
+
+  return applied;
+}
+
+function ocrProgressMessage(status) {
+  const labels = {
+    "loading tesseract core":
+      "OCRエンジンを読み込み中…",
+
+    "initializing tesseract":
+      "OCRエンジンを初期化中…",
+
+    "loading language traineddata":
+      "日本語データを読み込み中…",
+
+    "initializing api":
+      "文字認識を準備中…",
+
+    "recognizing text":
+      "スクショを読み取り中…"
+  };
+
+  return (
+    labels[status] ||
+    "OCR処理中…"
+  );
+}
+
+async function importSuumoScreenshot(
+  file
+) {
+  if (
+    !file ||
+    state.suumoOcrBusy
+  ) {
+    return;
+  }
+
+  state.suumoOcrBusy = true;
+  el.suumoScreenshotButton.disabled =
+    true;
+
+  el.suumoOcrSummary.classList.add(
+    "hidden"
+  );
+
+  updateSuumoOcrProgress(
+    "OCRライブラリを読み込み中…",
+    2
+  );
+
+  let worker = null;
+
+  try {
+    const Tesseract =
+      await ensureTesseractLoaded();
+
+    worker =
+      await Tesseract.createWorker(
+        "jpn+eng",
+        1,
+        {
+          logger:
+            (message) => {
+              const progress =
+                Number.isFinite(
+                  message.progress
+                )
+                  ? (
+                      8 +
+                      message.progress *
+                      88
+                    )
+                  : 8;
+
+              updateSuumoOcrProgress(
+                ocrProgressMessage(
+                  message.status
+                ),
+                progress
+              );
+            }
+        }
+      );
+
+    const result =
+      await worker.recognize(
+        file
+      );
+
+    updateSuumoOcrProgress(
+      "読み取り結果を解析中…",
+      97
+    );
+
+    const parsed =
+      parseSuumoOcrText(
+        result?.data?.text || ""
+      );
+
+    const applied =
+      applySuumoParsedData(
+        parsed
+      );
+
+    updateSuumoOcrProgress(
+      "読み取り完了",
+      100
+    );
+
+    if (applied.length) {
+      setSuumoOcrSummary(
+        `${applied.join(" / ")} をフォームへ反映しました。内容を確認・修正してから「保存」を押してください。`
+      );
+    } else {
+      setSuumoOcrSummary(
+        "物件情報を十分に読み取れませんでした。別のスクショを試すか、手入力してください。",
+        "warning"
+      );
+    }
+  } catch (error) {
+    console.error(error);
+
+    setSuumoOcrSummary(
+      error?.message ||
+      "スクショの読み取りに失敗しました。",
+      "error"
+    );
+
+    updateSuumoOcrProgress(
+      "OCRに失敗しました",
+      0
+    );
+  } finally {
+    if (worker) {
+      try {
+        await worker.terminate();
+      } catch {
+        // no-op
+      }
+    }
+
+    state.suumoOcrBusy = false;
+    el.suumoScreenshotButton.disabled =
+      false;
+
+    el.suumoScreenshotInput.value =
+      "";
+  }
+}
+
 function profileHasValue(profile) {
   if (!profile || typeof profile !== "object") {
     return false;
@@ -1578,7 +2530,10 @@ function profileHasValue(profile) {
     profile.layout,
     profile.buildingAgeYears,
     profile.stationWalkMinutes,
-    profile.memo
+    profile.memo,
+    Array.isArray(profile.stationAccesses)
+      ? profile.stationAccesses.length
+      : 0
   ].some(
     (value) =>
       value !== null &&
@@ -1612,6 +2567,56 @@ function normalizeCandidateProfile(profile) {
     typeof profile === "object"
       ? profile
       : {};
+
+  const stationAccesses =
+    normalizeStationAccesses(
+      source.stationAccesses
+    );
+
+  let selectedStationAccessId =
+    typeof source.selectedStationAccessId ===
+      "string"
+      ? source.selectedStationAccessId
+      : "manual";
+
+  if (
+    selectedStationAccessId !==
+      "manual" &&
+    !stationAccesses.some(
+      (access) =>
+        access.id ===
+        selectedStationAccessId
+    )
+  ) {
+    selectedStationAccessId =
+      stationAccesses.length
+        ? shortestStationAccessId(
+            stationAccesses
+          )
+        : "manual";
+  }
+
+  let stationWalkMinutes =
+    Number.isFinite(
+      Number(
+        source.stationWalkMinutes
+      )
+    )
+      ? Number(
+          source.stationWalkMinutes
+        )
+      : null;
+
+  const selectedAccess =
+    selectedStationAccess(
+      stationAccesses,
+      selectedStationAccessId
+    );
+
+  if (selectedAccess) {
+    stationWalkMinutes =
+      selectedAccess.walkMinutes;
+  }
 
   return {
     rentManYen:
@@ -1647,12 +2652,11 @@ function normalizeCandidateProfile(profile) {
         ? Number(source.buildingAgeYears)
         : null,
 
-    stationWalkMinutes:
-      Number.isFinite(
-        Number(source.stationWalkMinutes)
-      )
-        ? Number(source.stationWalkMinutes)
-        : null,
+    stationWalkMinutes,
+
+    stationAccesses,
+
+    selectedStationAccessId,
 
     parking:
       ["YES", "NO", "UNKNOWN"].includes(
@@ -1962,6 +2966,89 @@ function renderCandidateProfilePanel(
       panel.appendChild(grid);
     }
 
+    if (
+      profile.stationAccesses.length
+    ) {
+      const accessBox =
+        document.createElement(
+          "div"
+        );
+
+      accessBox.className =
+        "profile-station-access-display";
+
+      const accessTitle =
+        document.createElement(
+          "div"
+        );
+
+      accessTitle.className =
+        "profile-station-access-display-title";
+
+      accessTitle.textContent =
+        "駅アクセス";
+
+      accessBox.appendChild(
+        accessTitle
+      );
+
+      profile.stationAccesses.forEach(
+        (access) => {
+          const row =
+            document.createElement(
+              "div"
+            );
+
+          row.className =
+            "profile-station-access-row";
+
+          const isSelected =
+            profile.selectedStationAccessId ===
+            access.id;
+
+          if (isSelected) {
+            row.classList.add(
+              "selected"
+            );
+
+            const badge =
+              document.createElement(
+                "span"
+              );
+
+            badge.className =
+              "profile-station-access-badge";
+
+            badge.textContent =
+              "評価";
+
+            row.appendChild(
+              badge
+            );
+          }
+
+          const text =
+            document.createElement(
+              "span"
+            );
+
+          text.textContent =
+            `${
+              access.route
+                ? `${access.route} / `
+                : ""
+            }${access.station} 徒歩${access.walkMinutes}分`;
+
+          row.appendChild(text);
+          accessBox.appendChild(row);
+        }
+      );
+
+      panel.appendChild(
+        accessBox
+      );
+    }
+
     const calc =
       candidateProfileCalculations(
         profile
@@ -2156,6 +3243,12 @@ function currentProfileFromForm() {
         el.profileStationWalk
       ),
 
+    stationAccesses:
+      state.editingStationAccesses,
+
+    selectedStationAccessId:
+      state.editingStationAccessSelection,
+
     parking:
       el.profileParking.value,
 
@@ -2203,6 +3296,14 @@ function setProfileForm(profile) {
     )
       ? p.stationWalkMinutes
       : "";
+
+  state.editingStationAccesses =
+    p.stationAccesses;
+
+  state.editingStationAccessSelection =
+    p.selectedStationAccessId;
+
+  renderStationAccessOptions();
 
   el.profileParking.value =
     p.parking;
@@ -2309,6 +3410,17 @@ function openCandidateProfileDialog(
     candidate.profile
   );
 
+  el.suumoOcrStatus.classList.add(
+    "hidden"
+  );
+
+  el.suumoOcrSummary.classList.add(
+    "hidden"
+  );
+
+  el.suumoScreenshotInput.value =
+    "";
+
   el.clearCandidateProfileButton.disabled =
     !profileHasValue(
       candidate.profile
@@ -2320,6 +3432,10 @@ function openCandidateProfileDialog(
 function closeCandidateProfileDialog() {
   state.editingProfileCandidateId =
     null;
+
+  state.editingStationAccesses = [];
+  state.editingStationAccessSelection =
+    "manual";
 
   if (
     el.candidateProfileDialog.open
@@ -5548,6 +6664,43 @@ function bindEvents() {
     (event) => {
       event.preventDefault();
       closeCandidateDialog();
+    }
+  );
+
+  el.suumoScreenshotButton.addEventListener(
+    "click",
+    () => {
+      if (!state.suumoOcrBusy) {
+        el.suumoScreenshotInput.click();
+      }
+    }
+  );
+
+  el.suumoScreenshotInput.addEventListener(
+    "change",
+    () => {
+      const file =
+        el.suumoScreenshotInput.files?.[0];
+
+      if (file) {
+        importSuumoScreenshot(
+          file
+        );
+      }
+    }
+  );
+
+  el.profileStationWalk.addEventListener(
+    "input",
+    () => {
+      if (
+        state.editingStationAccesses.length
+      ) {
+        state.editingStationAccessSelection =
+          "manual";
+
+        renderStationAccessOptions();
+      }
     }
   );
 

@@ -1997,3 +1997,226 @@ details { margin-top: 15px; color: var(--muted); font-size: .76rem; line-height:
     grid-column: auto;
   }
 }
+
+
+/* =========================================================
+   SUUMO screenshot import - v2.3
+========================================================= */
+
+.suumo-import-section {
+  margin-top: 13px;
+  padding: 12px;
+  border: 1px solid #d8e1ed;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.suumo-import-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.suumo-import-header strong {
+  color: #253247;
+  font-size: .83rem;
+}
+
+.suumo-import-button {
+  min-height: 37px;
+  padding: 0 12px;
+  border: 1px solid #8fb2df;
+  border-radius: 9px;
+  background: #eaf2ff;
+  color: #1769e0;
+  font-size: .72rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.suumo-import-button:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
+.suumo-import-note {
+  margin: 8px 0 0;
+  color: #687588;
+  font-size: .68rem;
+  line-height: 1.5;
+}
+
+.suumo-ocr-status {
+  margin-top: 9px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.suumo-ocr-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #526174;
+  font-size: .68rem;
+  font-weight: 750;
+}
+
+.suumo-ocr-status progress {
+  width: 100%;
+  height: 8px;
+  margin-top: 7px;
+}
+
+.suumo-ocr-summary {
+  margin-top: 9px;
+  padding: 10px;
+  border-radius: 9px;
+  background: #eef8f2;
+  color: #28704b;
+  font-size: .7rem;
+  line-height: 1.5;
+}
+
+.suumo-ocr-summary.warning {
+  background: #fff7e8;
+  color: #8a5b14;
+}
+
+.suumo-ocr-summary.error {
+  background: #fff0ee;
+  color: #b42318;
+}
+
+.station-access-section {
+  padding: 10px;
+  border: 1px solid #d8e1ed;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.station-access-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.station-access-title > span {
+  color: #526174;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.station-access-title small {
+  color: #7a8798;
+  font-size: .62rem;
+}
+
+.station-access-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.station-access-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 8px 9px;
+  border: 1px solid #e1e7ef;
+  border-radius: 9px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.station-access-option:has(input:checked) {
+  border-color: #8fb2df;
+  background: #eef5ff;
+}
+
+.station-access-option input {
+  margin-top: 2px;
+}
+
+.station-access-main {
+  min-width: 0;
+}
+
+.station-access-main strong {
+  display: block;
+  color: #253247;
+  font-size: .72rem;
+  overflow-wrap: anywhere;
+}
+
+.station-access-main span {
+  display: block;
+  margin-top: 2px;
+  color: #687588;
+  font-size: .64rem;
+}
+
+.station-access-note {
+  margin: 8px 0 0;
+  color: #7a8798;
+  font-size: .63rem;
+  line-height: 1.45;
+}
+
+.profile-station-access-display {
+  margin-top: 7px;
+  padding: 9px;
+  border-radius: 9px;
+  background: #f7f9fc;
+}
+
+.profile-station-access-display-title {
+  color: #687588;
+  font-size: .61rem;
+  font-weight: 850;
+}
+
+.profile-station-access-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 5px;
+  color: #526174;
+  font-size: .68rem;
+  line-height: 1.4;
+}
+
+.profile-station-access-row.selected {
+  color: #1769e0;
+  font-weight: 800;
+}
+
+.profile-station-access-badge {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #eaf2ff;
+  color: #1769e0;
+  font-size: .55rem;
+  font-weight: 850;
+}
+
+@media (max-width: 760px) {
+  .suumo-import-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .suumo-import-button {
+    width: 100%;
+  }
+
+  .station-access-title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
