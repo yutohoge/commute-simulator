@@ -12,7 +12,7 @@
 <body>
   <header class="app-header">
     <div>
-      <p class="eyebrow">COMMUTE SIMULATOR v2.0</p>
+      <p class="eyebrow">COMMUTE SIMULATOR v2.1</p>
       <h1>通勤・移動時間シミュレーター</h1>
     </div>
     <button id="resetButton" class="subtle-button" type="button">初期化</button>
@@ -138,7 +138,7 @@
         </div>
 
         <p class="candidate-storage-note">
-          候補と物件プロフィールはこのタブ内だけに保存します。プロフィールはすべて任意入力です。
+          候補・物件プロフィール・取得した周辺施設はこのタブ内だけに保存します。プロフィールはすべて任意入力です。
         </p>
 
         <div id="candidateConditionNotice" class="candidate-condition-notice hidden"></div>
@@ -245,6 +245,8 @@
         <p>目的地と検索履歴は永続保存しません。同一条件の結果は、このページを閉じるまで最大30分間だけメモリ内で再利用します。</p>
         <p>「交通状況による補正」は、交通状況を考慮した所要時間と、同じルートを交通状況なしで走る場合の所要時間との差です。</p>
         <p>「公共交通をGoogleマップで見る」はGoogle Maps本体を開くリンクで、Routes APIの公共交通検索は使用しません。</p>
+        <p>周辺施設は候補カードの「周辺施設を検索」を押したときだけPlaces API (New) のNearby Searchを1回実行します。結果の表示だけでは追加のPlaces APIリクエストは発生しません。</p>
+        <p>周辺施設までの距離は候補地点からの直線距離です。徒歩ルートの距離ではありません。</p>
       </details>
     </section>
   </main>
@@ -375,9 +377,9 @@
               id="profileArea"
               type="number"
               min="0"
-              step="0.1"
+              step="0.01"
               inputmode="decimal"
-              placeholder="58.2">
+              placeholder="58.25">
             <span>㎡</span>
           </div>
         </label>

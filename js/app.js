@@ -379,10 +379,19 @@ function loadCandidates() {
         ? parsed.map(
             (candidate) => ({
               ...candidate,
+
               profile:
                 normalizeCandidateProfile(
                   candidate.profile
-                )
+                ),
+
+              nearby:
+                normalizeNearbyData(
+                  candidate.nearby
+                ),
+
+              nearbyError:
+                ""
             })
           )
         : [];
@@ -541,6 +550,819 @@ function trafficAdjustmentLabel(minutes) {
   return "±0分";
 }
 
+
+
+const NEARBY_SEARCH_RADIUS_METERS = 1500;
+const NEARBY_SEARCH_MAX_RESULTS = 20;
+
+const NEARBY_FACILITY_CATEGORIES = [
+  {
+    key: "supermarket",
+    label: "スーパー",
+    types: [
+      "supermarket",
+      "grocery_store",
+      "discount_supermarket",
+      "hypermarket"
+    ]
+  },
+  {
+    key: "convenience",
+    label: "コンビニ",
+    types: [
+      "convenience_store"
+    ]
+  },
+  {
+    key: "drugstore",
+    label: "ドラッグストア",
+    types: [
+      "drugstore",
+      "pharmacy"
+    ]
+  },
+  {
+    key: "gym",
+    label: "ジム",
+    types: [
+      "gym",
+      "fitness_center",
+      "sports_club"
+    ]
+  },
+  {
+    key: "station",
+    label: "鉄道駅",
+    types: [
+      "train_station",
+      "subway_station",
+      "light_rail_station",
+      "transit_station"
+    ]
+  }
+];
+
+const NEARBY_INCLUDED_TYPES =
+  [...new Set(
+    NEARBY_FACILITY_CATEGORIES
+      .flatMap(
+        (category) =>
+          category.types
+      )
+  )];
+
+function normalizeNearbyFacility(facility) {
+  if (
+    !facility ||
+    typeof facility !== "object"
+  ) {
+    return null;
+  }
+
+  const lat =
+    Number(
+      facility.location?.lat
+    );
+
+  const lng =
+    Number(
+      facility.location?.lng
+    );
+
+  return {
+    name:
+      typeof facility.name === "string"
+        ? facility.name
+        : "",
+
+    distanceMeters:
+      Number.isFinite(
+        Number(
+          facility.distanceMeters
+        )
+      )
+        ? Number(
+            facility.distanceMeters
+          )
+        : null,
+
+    googleMapsURI:
+      typeof facility.googleMapsURI === "string"
+        ? facility.googleMapsURI
+        : "",
+
+    location:
+      Number.isFinite(lat) &&
+      Number.isFinite(lng)
+        ? { lat, lng }
+        : null
+  };
+}
+
+function normalizeNearbyData(nearby) {
+  if (
+    !nearby ||
+    typeof nearby !== "object"
+  ) {
+    return null;
+  }
+
+  const facilities = {};
+
+  NEARBY_FACILITY_CATEGORIES.forEach(
+    (category) => {
+      facilities[category.key] =
+        normalizeNearbyFacility(
+          nearby.facilities?.[
+            category.key
+          ]
+        );
+    }
+  );
+
+  return {
+    version: 1,
+
+    radiusMeters:
+      Number.isFinite(
+        Number(
+          nearby.radiusMeters
+        )
+      )
+        ? Number(
+            nearby.radiusMeters
+          )
+        : NEARBY_SEARCH_RADIUS_METERS,
+
+    searchedAt:
+      typeof nearby.searchedAt === "string"
+        ? nearby.searchedAt
+        : "",
+
+    facilities
+  };
+}
+
+function locationLiteral(location) {
+  if (!location) {
+    return null;
+  }
+
+  if (
+    typeof location.toJSON ===
+    "function"
+  ) {
+    return location.toJSON();
+  }
+
+  const lat =
+    typeof location.lat ===
+    "function"
+      ? location.lat()
+      : location.lat;
+
+  const lng =
+    typeof location.lng ===
+    "function"
+      ? location.lng()
+      : location.lng;
+
+  if (
+    !Number.isFinite(
+      Number(lat)
+    ) ||
+    !Number.isFinite(
+      Number(lng)
+    )
+  ) {
+    return null;
+  }
+
+  return {
+    lat: Number(lat),
+    lng: Number(lng)
+  };
+}
+
+function haversineDistanceMeters(
+  pointA,
+  pointB
+) {
+  const toRadians =
+    (degrees) =>
+      degrees *
+      Math.PI /
+      180;
+
+  const earthRadius =
+    6371000;
+
+  const lat1 =
+    toRadians(
+      pointA.lat
+    );
+
+  const lat2 =
+    toRadians(
+      pointB.lat
+    );
+
+  const deltaLat =
+    toRadians(
+      pointB.lat -
+      pointA.lat
+    );
+
+  const deltaLng =
+    toRadians(
+      pointB.lng -
+      pointA.lng
+    );
+
+  const a =
+    Math.sin(
+      deltaLat / 2
+    ) ** 2 +
+    Math.cos(lat1) *
+    Math.cos(lat2) *
+    Math.sin(
+      deltaLng / 2
+    ) ** 2;
+
+  return (
+    earthRadius *
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    )
+  );
+}
+
+function formatNearbyDistance(
+  meters
+) {
+  if (
+    !Number.isFinite(meters)
+  ) {
+    return "距離不明";
+  }
+
+  if (meters < 1000) {
+    return `約${Math.round(
+      meters / 10
+    ) * 10}m（直線）`;
+  }
+
+  return `約${(
+    meters / 1000
+  ).toFixed(1)}km（直線）`;
+}
+
+function placeMatchesCategory(
+  place,
+  category
+) {
+  const types =
+    Array.isArray(
+      place.types
+    )
+      ? place.types
+      : [];
+
+  return category.types.some(
+    (type) =>
+      types.includes(type)
+  );
+}
+
+function plainNearbyFacility(
+  candidate,
+  place
+) {
+  const location =
+    locationLiteral(
+      place.location
+    );
+
+  return {
+    name:
+      place.displayName ||
+      "名称不明",
+
+    distanceMeters:
+      location
+        ? Math.round(
+            haversineDistanceMeters(
+              candidate.origin,
+              location
+            )
+          )
+        : null,
+
+    googleMapsURI:
+      place.googleMapsURI ||
+      "",
+
+    location
+  };
+}
+
+function fallbackFacilityMapsUrl(
+  facility
+) {
+  if (
+    facility.googleMapsURI
+  ) {
+    return facility.googleMapsURI;
+  }
+
+  if (facility.location) {
+    const params =
+      new URLSearchParams({
+        api: "1",
+        query:
+          `${facility.location.lat},${facility.location.lng}`
+      });
+
+    return (
+      `https://www.google.com/maps/search/?${params.toString()}`
+    );
+  }
+
+  const params =
+    new URLSearchParams({
+      api: "1",
+      query:
+        facility.name
+    });
+
+  return (
+    `https://www.google.com/maps/search/?${params.toString()}`
+  );
+}
+
+function formatNearbySearchTime(
+  isoString
+) {
+  if (!isoString) {
+    return "";
+  }
+
+  const date =
+    new Date(isoString);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(
+    "ja-JP",
+    {
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }
+  ).format(date);
+}
+
+async function searchNearbyFacilities(
+  candidateId,
+  button
+) {
+  const candidate =
+    state.candidates.find(
+      (item) =>
+        item.id === candidateId
+    );
+
+  if (!candidate) {
+    return;
+  }
+
+  const previousText =
+    button.textContent;
+
+  button.disabled = true;
+  button.textContent =
+    "周辺施設を検索中…";
+
+  try {
+    const {
+      Place,
+      SearchNearbyRankPreference
+    } =
+      await google.maps.importLibrary(
+        "places"
+      );
+
+    const request = {
+      fields: [
+        "displayName",
+        "location",
+        "googleMapsURI",
+        "types"
+      ],
+
+      locationRestriction: {
+        center:
+          candidate.origin,
+
+        radius:
+          NEARBY_SEARCH_RADIUS_METERS
+      },
+
+      includedTypes:
+        NEARBY_INCLUDED_TYPES,
+
+      maxResultCount:
+        NEARBY_SEARCH_MAX_RESULTS,
+
+      rankPreference:
+        SearchNearbyRankPreference.DISTANCE,
+
+      language:
+        "ja",
+
+      region:
+        "JP"
+    };
+
+    const { places } =
+      await Place.searchNearby(
+        request
+      );
+
+    const normalizedPlaces =
+      (places || [])
+        .map(
+          (place) => ({
+            place,
+            facility:
+              plainNearbyFacility(
+                candidate,
+                place
+              )
+          })
+        )
+        .filter(
+          (item) =>
+            item.facility.location
+        )
+        .sort(
+          (a, b) =>
+            (
+              a.facility
+                .distanceMeters ??
+              Infinity
+            ) -
+            (
+              b.facility
+                .distanceMeters ??
+              Infinity
+            )
+        );
+
+    const facilities = {};
+
+    NEARBY_FACILITY_CATEGORIES.forEach(
+      (category) => {
+        const match =
+          normalizedPlaces.find(
+            ({ place }) =>
+              placeMatchesCategory(
+                place,
+                category
+              )
+          );
+
+        facilities[
+          category.key
+        ] =
+          match
+            ? match.facility
+            : null;
+      }
+    );
+
+    candidate.nearby = {
+      version: 1,
+      radiusMeters:
+        NEARBY_SEARCH_RADIUS_METERS,
+      searchedAt:
+        new Date().toISOString(),
+      facilities
+    };
+
+    persistCandidates();
+    renderCandidates();
+
+    setStatus(
+      `「${candidate.name}」の周辺施設を取得しました。`
+    );
+  } catch (error) {
+    console.error(error);
+
+    candidate.nearbyError =
+      error?.message ||
+      "周辺施設の取得に失敗しました。";
+
+    renderCandidates();
+
+    setStatus(
+      candidate.nearbyError,
+      "error"
+    );
+  } finally {
+    button.disabled = false;
+    button.textContent =
+      previousText;
+  }
+}
+
+function renderCandidateNearbyPanel(
+  candidate,
+  details
+) {
+  const nearby =
+    normalizeNearbyData(
+      candidate.nearby
+    );
+
+  const status =
+    details.querySelector(
+      ".candidate-nearby-status"
+    );
+
+  const panel =
+    details.querySelector(
+      ".candidate-nearby-panel"
+    );
+
+  panel.replaceChildren();
+
+  if (!nearby) {
+    status.textContent =
+      "未検索";
+
+    status.classList.remove(
+      "filled"
+    );
+
+    if (
+      candidate.nearbyError
+    ) {
+      const error =
+        document.createElement(
+          "p"
+        );
+
+      error.className =
+        "nearby-error";
+
+      error.textContent =
+        candidate.nearbyError;
+
+      panel.appendChild(error);
+    }
+
+    const intro =
+      document.createElement("p");
+
+    intro.className =
+      "nearby-search-intro";
+
+    intro.textContent =
+      `候補地点から約${(
+        NEARBY_SEARCH_RADIUS_METERS /
+        1000
+      ).toFixed(1)}km圏内のスーパー・コンビニ・ドラッグストア・ジム・鉄道駅を検索します。距離は直線距離です。`;
+
+    const button =
+      document.createElement(
+        "button"
+      );
+
+    button.type =
+      "button";
+
+    button.className =
+      "nearby-search-button";
+
+    button.textContent =
+      "周辺施設を検索（Places API 1回）";
+
+    button.addEventListener(
+      "click",
+      () =>
+        searchNearbyFacilities(
+          candidate.id,
+          button
+        )
+    );
+
+    panel.append(
+      intro,
+      button
+    );
+
+    return;
+  }
+
+  status.textContent =
+    "取得済み";
+
+  status.classList.add(
+    "filled"
+  );
+
+  const list =
+    document.createElement(
+      "div"
+    );
+
+  list.className =
+    "nearby-result-list";
+
+  NEARBY_FACILITY_CATEGORIES.forEach(
+    (category) => {
+      const facility =
+        nearby.facilities[
+          category.key
+        ];
+
+      const row =
+        document.createElement(
+          "div"
+        );
+
+      row.className =
+        "nearby-result-item";
+
+      const categoryElement =
+        document.createElement(
+          "span"
+        );
+
+      categoryElement.className =
+        "nearby-result-category";
+
+      categoryElement.textContent =
+        category.label;
+
+      const main =
+        document.createElement(
+          "div"
+        );
+
+      main.className =
+        "nearby-result-main";
+
+      if (facility) {
+        const name =
+          document.createElement(
+            "span"
+          );
+
+        name.className =
+          "nearby-result-name";
+
+        name.textContent =
+          facility.name;
+
+        const distance =
+          document.createElement(
+            "span"
+          );
+
+        distance.className =
+          "nearby-result-distance";
+
+        distance.textContent =
+          formatNearbyDistance(
+            facility.distanceMeters
+          );
+
+        main.append(
+          name,
+          distance
+        );
+
+        const mapButton =
+          document.createElement(
+            "button"
+          );
+
+        mapButton.type =
+          "button";
+
+        mapButton.className =
+          "nearby-map-link";
+
+        mapButton.textContent =
+          "地図";
+
+        mapButton.addEventListener(
+          "click",
+          () => {
+            window.open(
+              fallbackFacilityMapsUrl(
+                facility
+              ),
+              "_blank",
+              "noopener"
+            );
+          }
+        );
+
+        row.append(
+          categoryElement,
+          main,
+          mapButton
+        );
+      } else {
+        const missing =
+          document.createElement(
+            "span"
+          );
+
+        missing.className =
+          "nearby-result-missing";
+
+        missing.textContent =
+          "今回の検索では見つからず";
+
+        main.appendChild(
+          missing
+        );
+
+        row.append(
+          categoryElement,
+          main
+        );
+      }
+
+      list.appendChild(
+        row
+      );
+    }
+  );
+
+  const meta =
+    document.createElement("p");
+
+  meta.className =
+    "nearby-meta";
+
+  const searchedAt =
+    formatNearbySearchTime(
+      nearby.searchedAt
+    );
+
+  meta.textContent =
+    `${(
+      nearby.radiusMeters /
+      1000
+    ).toFixed(1)}km圏内 / 直線距離${
+      searchedAt
+        ? ` / 取得 ${searchedAt}`
+        : ""
+    }`;
+
+  const refreshButton =
+    document.createElement(
+      "button"
+    );
+
+  refreshButton.type =
+    "button";
+
+  refreshButton.className =
+    "nearby-search-button";
+
+  refreshButton.textContent =
+    "周辺施設を再検索（Places API 1回）";
+
+  refreshButton.addEventListener(
+    "click",
+    () =>
+      searchNearbyFacilities(
+        candidate.id,
+        refreshButton
+      )
+  );
+
+  panel.append(
+    list,
+    meta,
+    refreshButton
+  );
+}
 
 function profileHasValue(profile) {
   if (!profile || typeof profile !== "object") {
@@ -727,6 +1549,7 @@ function formatSquareMeters(value) {
   return `${Number(value).toLocaleString(
     "ja-JP",
     {
+      minimumFractionDigits: 0,
       maximumFractionDigits: 2
     }
   )}㎡`;
@@ -1455,6 +2278,14 @@ function renderCandidates() {
           <div class="candidate-profile-panel"></div>
         </details>
 
+        <details class="candidate-nearby-details">
+          <summary>
+            <span>周辺施設</span>
+            <span class="candidate-nearby-status">未検索</span>
+          </summary>
+          <div class="candidate-nearby-panel"></div>
+        </details>
+
         <p class="candidate-condition"></p>
 
         <div class="candidate-actions">
@@ -1517,6 +2348,13 @@ function renderCandidates() {
         candidate,
         card.querySelector(
           ".candidate-profile-details"
+        )
+      );
+
+      renderCandidateNearbyPanel(
+        candidate,
+        card.querySelector(
+          ".candidate-nearby-details"
         )
       );
 
@@ -1738,6 +2576,13 @@ function savePendingCandidate() {
         existingCandidate.profile
       );
 
+    candidate.nearby =
+      normalizeNearbyData(
+        existingCandidate.nearby
+      );
+
+    candidate.nearbyError = "";
+
     state.candidates[
       duplicateIndex
     ] = candidate;
@@ -1746,6 +2591,10 @@ function savePendingCandidate() {
       normalizeCandidateProfile(
         null
       );
+
+    candidate.nearby = null;
+    candidate.nearbyError = "";
+
     state.candidates.push(
       candidate
     );
