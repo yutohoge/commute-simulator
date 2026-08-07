@@ -25,6 +25,7 @@ const state = {
   lastResults: [],
   candidates: [],
   pendingCandidate: null,
+  editingProfileCandidateId: null,
   timeComparison: null
 };
 
@@ -67,6 +68,22 @@ const el = {
   candidateDialogSummary: document.getElementById("candidateDialogSummary"),
   candidateDialogClose: document.getElementById("candidateDialogClose"),
   candidateCancelButton: document.getElementById("candidateCancelButton"),
+
+  candidateProfileDialog: document.getElementById("candidateProfileDialog"),
+  candidateProfileForm: document.getElementById("candidateProfileForm"),
+  candidateProfileDialogClose: document.getElementById("candidateProfileDialogClose"),
+  candidateProfileCancelButton: document.getElementById("candidateProfileCancelButton"),
+  clearCandidateProfileButton: document.getElementById("clearCandidateProfileButton"),
+  profileCandidateName: document.getElementById("profileCandidateName"),
+  profileRent: document.getElementById("profileRent"),
+  profileManagementFee: document.getElementById("profileManagementFee"),
+  profileArea: document.getElementById("profileArea"),
+  profileLayout: document.getElementById("profileLayout"),
+  profileBuildingAge: document.getElementById("profileBuildingAge"),
+  profileStationWalk: document.getElementById("profileStationWalk"),
+  profileParking: document.getElementById("profileParking"),
+  profileMemo: document.getElementById("profileMemo"),
+  profileCalculationPreview: document.getElementById("profileCalculationPreview"),
 
   timeCompareDate: document.getElementById("timeCompareDate"),
   timeCompareEmpty: document.getElementById("timeCompareEmpty"),
@@ -356,7 +373,19 @@ function loadCandidates() {
 
   try {
     const parsed = JSON.parse(raw);
-    state.candidates = Array.isArray(parsed) ? parsed : [];
+
+    state.candidates =
+      Array.isArray(parsed)
+        ? parsed.map(
+            (candidate) => ({
+              ...candidate,
+              profile:
+                normalizeCandidateProfile(
+                  candidate.profile
+                )
+            })
+          )
+        : [];
   } catch {
     state.candidates = [];
   }
@@ -512,6 +541,824 @@ function trafficAdjustmentLabel(minutes) {
   return "±0分";
 }
 
+
+function profileHasValue(profile) {
+  if (!profile || typeof profile !== "object") {
+    return false;
+  }
+
+  return [
+    profile.rentManYen,
+    profile.managementFeeYen,
+    profile.areaSqm,
+    profile.layout,
+    profile.buildingAgeYears,
+    profile.stationWalkMinutes,
+    profile.memo
+  ].some(
+    (value) =>
+      value !== null &&
+      value !== undefined &&
+      String(value).trim() !== ""
+  ) || (
+    profile.parking &&
+    profile.parking !== "UNKNOWN"
+  );
+}
+
+function optionalNumberFromInput(input) {
+  const raw =
+    String(input.value || "").trim();
+
+  if (raw === "") {
+    return null;
+  }
+
+  const value =
+    Number(raw);
+
+  return Number.isFinite(value)
+    ? value
+    : null;
+}
+
+function normalizeCandidateProfile(profile) {
+  const source =
+    profile &&
+    typeof profile === "object"
+      ? profile
+      : {};
+
+  return {
+    rentManYen:
+      Number.isFinite(
+        Number(source.rentManYen)
+      )
+        ? Number(source.rentManYen)
+        : null,
+
+    managementFeeYen:
+      Number.isFinite(
+        Number(source.managementFeeYen)
+      )
+        ? Number(source.managementFeeYen)
+        : null,
+
+    areaSqm:
+      Number.isFinite(
+        Number(source.areaSqm)
+      )
+        ? Number(source.areaSqm)
+        : null,
+
+    layout:
+      typeof source.layout === "string"
+        ? source.layout.trim()
+        : "",
+
+    buildingAgeYears:
+      Number.isFinite(
+        Number(source.buildingAgeYears)
+      )
+        ? Number(source.buildingAgeYears)
+        : null,
+
+    stationWalkMinutes:
+      Number.isFinite(
+        Number(source.stationWalkMinutes)
+      )
+        ? Number(source.stationWalkMinutes)
+        : null,
+
+    parking:
+      ["YES", "NO", "UNKNOWN"].includes(
+        source.parking
+      )
+        ? source.parking
+        : "UNKNOWN",
+
+    memo:
+      typeof source.memo === "string"
+        ? source.memo.trim()
+        : ""
+  };
+}
+
+function candidateProfileCalculations(profile) {
+  const normalized =
+    normalizeCandidateProfile(profile);
+
+  const rentYen =
+    Number.isFinite(
+      normalized.rentManYen
+    )
+      ? normalized.rentManYen * 10000
+      : null;
+
+  const area =
+    Number.isFinite(
+      normalized.areaSqm
+    ) &&
+    normalized.areaSqm > 0
+      ? normalized.areaSqm
+      : null;
+
+  const managementFee =
+    Number.isFinite(
+      normalized.managementFeeYen
+    )
+      ? normalized.managementFeeYen
+      : null;
+
+  const rentPerSqm =
+    Number.isFinite(rentYen) &&
+    Number.isFinite(area)
+      ? rentYen / area
+      : null;
+
+  const totalMonthlyCost =
+    Number.isFinite(rentYen) &&
+    Number.isFinite(managementFee)
+      ? rentYen + managementFee
+      : null;
+
+  const effectiveCostPerSqm =
+    Number.isFinite(totalMonthlyCost) &&
+    Number.isFinite(area)
+      ? totalMonthlyCost / area
+      : null;
+
+  return {
+    rentYen,
+    area,
+    managementFee,
+    rentPerSqm,
+    totalMonthlyCost,
+    effectiveCostPerSqm
+  };
+}
+
+function formatYen(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+
+  return `${Math.round(value).toLocaleString("ja-JP")}円`;
+}
+
+function formatManYen(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+
+  return `${Number(value).toLocaleString(
+    "ja-JP",
+    {
+      maximumFractionDigits: 2
+    }
+  )}万円`;
+}
+
+function formatSquareMeters(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+
+  return `${Number(value).toLocaleString(
+    "ja-JP",
+    {
+      maximumFractionDigits: 2
+    }
+  )}㎡`;
+}
+
+function parkingLabel(value) {
+  if (value === "YES") {
+    return "あり";
+  }
+
+  if (value === "NO") {
+    return "なし";
+  }
+
+  return "—";
+}
+
+function profileTeaserValues(profile) {
+  const p =
+    normalizeCandidateProfile(profile);
+
+  const values = [];
+
+  if (Number.isFinite(p.rentManYen)) {
+    values.push(
+      formatManYen(p.rentManYen)
+    );
+  }
+
+  if (Number.isFinite(p.areaSqm)) {
+    values.push(
+      formatSquareMeters(p.areaSqm)
+    );
+  }
+
+  if (p.layout) {
+    values.push(p.layout);
+  }
+
+  return values.slice(0, 3);
+}
+
+function addProfileDisplayItem(
+  container,
+  label,
+  value
+) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === "" ||
+    value === "—"
+  ) {
+    return;
+  }
+
+  const item =
+    document.createElement("div");
+
+  item.className =
+    "profile-display-item";
+
+  const labelElement =
+    document.createElement("span");
+
+  labelElement.className =
+    "label";
+
+  labelElement.textContent =
+    label;
+
+  const valueElement =
+    document.createElement("span");
+
+  valueElement.className =
+    "value";
+
+  valueElement.textContent =
+    String(value);
+
+  item.append(
+    labelElement,
+    valueElement
+  );
+
+  container.appendChild(item);
+}
+
+function renderCandidateProfilePanel(
+  candidate,
+  details
+) {
+  const profile =
+    normalizeCandidateProfile(
+      candidate.profile
+    );
+
+  const hasProfile =
+    profileHasValue(profile);
+
+  const status =
+    details.querySelector(
+      ".candidate-profile-status"
+    );
+
+  status.textContent =
+    hasProfile
+      ? "入力済み"
+      : "未入力";
+
+  status.classList.toggle(
+    "filled",
+    hasProfile
+  );
+
+  const panel =
+    details.querySelector(
+      ".candidate-profile-panel"
+    );
+
+  panel.replaceChildren();
+
+  if (!hasProfile) {
+    const empty =
+      document.createElement("p");
+
+    empty.className =
+      "profile-empty-message";
+
+    empty.textContent =
+      "物件情報はまだ入力されていません。通勤比較だけでもそのまま利用できます。";
+
+    panel.appendChild(empty);
+  } else {
+    const grid =
+      document.createElement("div");
+
+    grid.className =
+      "profile-display-grid";
+
+    addProfileDisplayItem(
+      grid,
+      "家賃",
+      Number.isFinite(
+        profile.rentManYen
+      )
+        ? `${formatManYen(profile.rentManYen)}/月`
+        : null
+    );
+
+    addProfileDisplayItem(
+      grid,
+      "管理・共益費",
+      Number.isFinite(
+        profile.managementFeeYen
+      )
+        ? `${formatYen(profile.managementFeeYen)}/月`
+        : null
+    );
+
+    addProfileDisplayItem(
+      grid,
+      "専有面積",
+      Number.isFinite(
+        profile.areaSqm
+      )
+        ? formatSquareMeters(
+            profile.areaSqm
+          )
+        : null
+    );
+
+    addProfileDisplayItem(
+      grid,
+      "間取り",
+      profile.layout || null
+    );
+
+    addProfileDisplayItem(
+      grid,
+      "築年数",
+      Number.isFinite(
+        profile.buildingAgeYears
+      )
+        ? `築${profile.buildingAgeYears}年`
+        : null
+    );
+
+    addProfileDisplayItem(
+      grid,
+      "駅徒歩",
+      Number.isFinite(
+        profile.stationWalkMinutes
+      )
+        ? `${profile.stationWalkMinutes}分`
+        : null
+    );
+
+    addProfileDisplayItem(
+      grid,
+      "駐車場",
+      parkingLabel(
+        profile.parking
+      )
+    );
+
+    if (grid.children.length) {
+      panel.appendChild(grid);
+    }
+
+    const calc =
+      candidateProfileCalculations(
+        profile
+      );
+
+    if (
+      Number.isFinite(
+        calc.rentPerSqm
+      )
+    ) {
+      const calculatedCard =
+        document.createElement("div");
+
+      calculatedCard.className =
+        "profile-calculated-card";
+
+      const title =
+        document.createElement("div");
+
+      title.className =
+        "profile-calculated-card-title";
+
+      title.textContent =
+        "自動計算";
+
+      const values =
+        document.createElement("div");
+
+      values.className =
+        "profile-calculated-values";
+
+      const rentUnit =
+        document.createElement("div");
+
+      rentUnit.className =
+        "profile-calculated-value";
+
+      rentUnit.innerHTML =
+        "<span>1㎡あたり家賃</span>";
+
+      const rentUnitStrong =
+        document.createElement("strong");
+
+      rentUnitStrong.textContent =
+        `${formatYen(calc.rentPerSqm)}/㎡`;
+
+      rentUnit.appendChild(
+        rentUnitStrong
+      );
+
+      values.appendChild(
+        rentUnit
+      );
+
+      if (
+        Number.isFinite(
+          calc.totalMonthlyCost
+        )
+      ) {
+        const total =
+          document.createElement("div");
+
+        total.className =
+          "profile-calculated-value";
+
+        total.innerHTML =
+          "<span>月額住居費</span>";
+
+        const totalStrong =
+          document.createElement("strong");
+
+        totalStrong.textContent =
+          formatYen(
+            calc.totalMonthlyCost
+          );
+
+        total.appendChild(
+          totalStrong
+        );
+
+        values.appendChild(
+          total
+        );
+      }
+
+      if (
+        Number.isFinite(
+          calc.effectiveCostPerSqm
+        )
+      ) {
+        const effective =
+          document.createElement("div");
+
+        effective.className =
+          "profile-calculated-value";
+
+        effective.innerHTML =
+          "<span>実質住居費単価</span>";
+
+        const effectiveStrong =
+          document.createElement("strong");
+
+        effectiveStrong.textContent =
+          `${formatYen(calc.effectiveCostPerSqm)}/㎡`;
+
+        effective.appendChild(
+          effectiveStrong
+        );
+
+        values.appendChild(
+          effective
+        );
+      }
+
+      calculatedCard.append(
+        title,
+        values
+      );
+
+      panel.appendChild(
+        calculatedCard
+      );
+    }
+
+    if (profile.memo) {
+      const memo =
+        document.createElement("div");
+
+      memo.className =
+        "profile-memo";
+
+      memo.textContent =
+        profile.memo;
+
+      panel.appendChild(memo);
+    }
+  }
+
+  const editButton =
+    document.createElement("button");
+
+  editButton.type =
+    "button";
+
+  editButton.className =
+    "candidate-profile-edit-button";
+
+  editButton.textContent =
+    hasProfile
+      ? "プロフィールを編集"
+      : "プロフィールを入力";
+
+  editButton.addEventListener(
+    "click",
+    () => {
+      openCandidateProfileDialog(
+        candidate.id
+      );
+    }
+  );
+
+  panel.appendChild(editButton);
+}
+
+function currentProfileFromForm() {
+  return normalizeCandidateProfile({
+    rentManYen:
+      optionalNumberFromInput(
+        el.profileRent
+      ),
+
+    managementFeeYen:
+      optionalNumberFromInput(
+        el.profileManagementFee
+      ),
+
+    areaSqm:
+      optionalNumberFromInput(
+        el.profileArea
+      ),
+
+    layout:
+      el.profileLayout.value,
+
+    buildingAgeYears:
+      optionalNumberFromInput(
+        el.profileBuildingAge
+      ),
+
+    stationWalkMinutes:
+      optionalNumberFromInput(
+        el.profileStationWalk
+      ),
+
+    parking:
+      el.profileParking.value,
+
+    memo:
+      el.profileMemo.value
+  });
+}
+
+function setProfileForm(profile) {
+  const p =
+    normalizeCandidateProfile(
+      profile
+    );
+
+  el.profileRent.value =
+    Number.isFinite(p.rentManYen)
+      ? p.rentManYen
+      : "";
+
+  el.profileManagementFee.value =
+    Number.isFinite(
+      p.managementFeeYen
+    )
+      ? p.managementFeeYen
+      : "";
+
+  el.profileArea.value =
+    Number.isFinite(p.areaSqm)
+      ? p.areaSqm
+      : "";
+
+  el.profileLayout.value =
+    p.layout;
+
+  el.profileBuildingAge.value =
+    Number.isFinite(
+      p.buildingAgeYears
+    )
+      ? p.buildingAgeYears
+      : "";
+
+  el.profileStationWalk.value =
+    Number.isFinite(
+      p.stationWalkMinutes
+    )
+      ? p.stationWalkMinutes
+      : "";
+
+  el.profileParking.value =
+    p.parking;
+
+  el.profileMemo.value =
+    p.memo;
+
+  updateProfileCalculationPreview();
+}
+
+function addProfilePreviewItem(
+  label,
+  value
+) {
+  const item =
+    document.createElement("div");
+
+  item.className =
+    "profile-preview-item";
+
+  const labelElement =
+    document.createElement("span");
+
+  labelElement.textContent =
+    label;
+
+  const valueElement =
+    document.createElement("strong");
+
+  valueElement.textContent =
+    value;
+
+  item.append(
+    labelElement,
+    valueElement
+  );
+
+  el.profileCalculationPreview.appendChild(
+    item
+  );
+}
+
+function updateProfileCalculationPreview() {
+  const profile =
+    currentProfileFromForm();
+
+  const calc =
+    candidateProfileCalculations(
+      profile
+    );
+
+  el.profileCalculationPreview.replaceChildren();
+
+  addProfilePreviewItem(
+    "1㎡あたり家賃",
+    Number.isFinite(
+      calc.rentPerSqm
+    )
+      ? `${formatYen(calc.rentPerSqm)}/㎡`
+      : "家賃＋面積で計算"
+  );
+
+  addProfilePreviewItem(
+    "月額住居費",
+    Number.isFinite(
+      calc.totalMonthlyCost
+    )
+      ? formatYen(
+          calc.totalMonthlyCost
+        )
+      : "家賃＋管理費で計算"
+  );
+
+  addProfilePreviewItem(
+    "実質住居費単価",
+    Number.isFinite(
+      calc.effectiveCostPerSqm
+    )
+      ? `${formatYen(calc.effectiveCostPerSqm)}/㎡`
+      : "家賃＋管理費＋面積で計算"
+  );
+}
+
+function openCandidateProfileDialog(
+  candidateId
+) {
+  const candidate =
+    state.candidates.find(
+      (item) =>
+        item.id === candidateId
+    );
+
+  if (!candidate) {
+    return;
+  }
+
+  state.editingProfileCandidateId =
+    candidateId;
+
+  el.profileCandidateName.textContent =
+    candidate.name;
+
+  setProfileForm(
+    candidate.profile
+  );
+
+  el.clearCandidateProfileButton.disabled =
+    !profileHasValue(
+      candidate.profile
+    );
+
+  el.candidateProfileDialog.showModal();
+}
+
+function closeCandidateProfileDialog() {
+  state.editingProfileCandidateId =
+    null;
+
+  if (
+    el.candidateProfileDialog.open
+  ) {
+    el.candidateProfileDialog.close();
+  }
+}
+
+function saveCandidateProfile() {
+  const candidate =
+    state.candidates.find(
+      (item) =>
+        item.id ===
+        state.editingProfileCandidateId
+    );
+
+  if (!candidate) {
+    closeCandidateProfileDialog();
+    return;
+  }
+
+  candidate.profile =
+    currentProfileFromForm();
+
+  persistCandidates();
+  renderCandidates();
+
+  closeCandidateProfileDialog();
+
+  setStatus(
+    `「${candidate.name}」のプロフィールを保存しました。`
+  );
+}
+
+function clearCandidateProfile() {
+  const candidate =
+    state.candidates.find(
+      (item) =>
+        item.id ===
+        state.editingProfileCandidateId
+    );
+
+  if (!candidate) {
+    return;
+  }
+
+  candidate.profile =
+    normalizeCandidateProfile(null);
+
+  persistCandidates();
+  renderCandidates();
+
+  setProfileForm(
+    candidate.profile
+  );
+
+  el.clearCandidateProfileButton.disabled =
+    true;
+
+  setStatus(
+    `「${candidate.name}」のプロフィールをクリアしました。`
+  );
+}
+
 function renderCandidates() {
   const sorted = [...state.candidates].sort(
     (a, b) =>
@@ -598,6 +1445,16 @@ function renderCandidates() {
           </div>
         </div>
 
+        <div class="candidate-profile-teaser"></div>
+
+        <details class="candidate-profile-details">
+          <summary>
+            <span>物件プロフィール</span>
+            <span class="candidate-profile-status">未入力</span>
+          </summary>
+          <div class="candidate-profile-panel"></div>
+        </details>
+
         <p class="candidate-condition"></p>
 
         <div class="candidate-actions">
@@ -625,6 +1482,43 @@ function renderCandidates() {
         .querySelector(".candidate-name")
         .textContent =
           candidate.name;
+
+      const teaser =
+        card.querySelector(
+          ".candidate-profile-teaser"
+        );
+
+      profileTeaserValues(
+        candidate.profile
+      ).forEach(
+        (value) => {
+          const chip =
+            document.createElement("span");
+
+          chip.className =
+            "profile-teaser-chip";
+
+          chip.textContent =
+            value;
+
+          teaser.appendChild(
+            chip
+          );
+        }
+      );
+
+      if (!teaser.children.length) {
+        teaser.classList.add(
+          "hidden"
+        );
+      }
+
+      renderCandidateProfilePanel(
+        candidate,
+        card.querySelector(
+          ".candidate-profile-details"
+        )
+      );
 
       card
         .querySelector(".candidate-condition")
@@ -831,15 +1725,27 @@ function savePendingCandidate() {
     );
 
   if (duplicateIndex >= 0) {
-    candidate.id =
+    const existingCandidate =
       state.candidates[
         duplicateIndex
-      ].id;
+      ];
+
+    candidate.id =
+      existingCandidate.id;
+
+    candidate.profile =
+      normalizeCandidateProfile(
+        existingCandidate.profile
+      );
 
     state.candidates[
       duplicateIndex
     ] = candidate;
   } else {
+    candidate.profile =
+      normalizeCandidateProfile(
+        null
+      );
     state.candidates.push(
       candidate
     );
@@ -2628,6 +3534,98 @@ function bindEvents() {
     (event) => {
       event.preventDefault();
       closeCandidateDialog();
+    }
+  );
+
+  el.candidateProfileForm.addEventListener(
+    "submit",
+    (event) => {
+      event.preventDefault();
+      saveCandidateProfile();
+    }
+  );
+
+  el.candidateProfileDialogClose.addEventListener(
+    "click",
+    closeCandidateProfileDialog
+  );
+
+  el.candidateProfileCancelButton.addEventListener(
+    "click",
+    closeCandidateProfileDialog
+  );
+
+  el.candidateProfileDialog.addEventListener(
+    "cancel",
+    (event) => {
+      event.preventDefault();
+      closeCandidateProfileDialog();
+    }
+  );
+
+  el.candidateProfileDialog.addEventListener(
+    "click",
+    (event) => {
+      if (
+        event.target ===
+        el.candidateProfileDialog
+      ) {
+        closeCandidateProfileDialog();
+      }
+    }
+  );
+
+  el.clearCandidateProfileButton.addEventListener(
+    "click",
+    () => {
+      const candidate =
+        state.candidates.find(
+          (item) =>
+            item.id ===
+            state.editingProfileCandidateId
+        );
+
+      if (
+        !candidate ||
+        !profileHasValue(
+          candidate.profile
+        )
+      ) {
+        return;
+      }
+
+      if (
+        !confirm(
+          `「${candidate.name}」のプロフィール入力をすべてクリアしますか？`
+        )
+      ) {
+        return;
+      }
+
+      clearCandidateProfile();
+    }
+  );
+
+  [
+    el.profileRent,
+    el.profileManagementFee,
+    el.profileArea,
+    el.profileLayout,
+    el.profileBuildingAge,
+    el.profileStationWalk,
+    el.profileParking,
+    el.profileMemo
+  ].forEach(
+    (input) => {
+      input.addEventListener(
+        "input",
+        updateProfileCalculationPreview
+      );
+
+      input.addEventListener(
+        "change",
+        updateProfileCalculationPreview
+      );
     }
   );
 

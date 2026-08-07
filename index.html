@@ -12,7 +12,7 @@
 <body>
   <header class="app-header">
     <div>
-      <p class="eyebrow">COMMUTE SIMULATOR v1.3.1</p>
+      <p class="eyebrow">COMMUTE SIMULATOR v2.0</p>
       <h1>通勤・移動時間シミュレーター</h1>
     </div>
     <button id="resetButton" class="subtle-button" type="button">初期化</button>
@@ -138,7 +138,7 @@
         </div>
 
         <p class="candidate-storage-note">
-          候補はこのタブ内だけに保存します。タブを閉じると消えます。
+          候補と物件プロフィールはこのタブ内だけに保存します。プロフィールはすべて任意入力です。
         </p>
 
         <div id="candidateConditionNotice" class="candidate-condition-notice hidden"></div>
@@ -313,6 +313,167 @@
       <div class="candidate-dialog-actions">
         <button id="candidateCancelButton" class="secondary-dialog-button" type="button">キャンセル</button>
         <button class="primary-dialog-button" type="submit">候補に追加</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="candidateProfileDialog" class="profile-dialog">
+    <form id="candidateProfileForm" class="profile-dialog-form">
+      <div class="profile-dialog-header">
+        <div>
+          <p class="eyebrow">PROPERTY PROFILE</p>
+          <h2>候補地プロフィール</h2>
+          <p id="profileCandidateName" class="profile-candidate-name"></p>
+        </div>
+
+        <button
+          id="candidateProfileDialogClose"
+          class="dialog-close-button"
+          type="button"
+          aria-label="プロフィール編集を閉じる">
+          ×
+        </button>
+      </div>
+
+      <p class="profile-optional-note">
+        すべて任意入力です。空欄のままでも候補地比較はそのまま使えます。
+      </p>
+
+      <div class="profile-form-grid">
+        <label class="profile-field">
+          <span>家賃</span>
+          <div class="profile-input-with-unit">
+            <input
+              id="profileRent"
+              type="number"
+              min="0"
+              step="0.1"
+              inputmode="decimal"
+              placeholder="15.8">
+            <span>万円/月</span>
+          </div>
+        </label>
+
+        <label class="profile-field">
+          <span>管理・共益費</span>
+          <div class="profile-input-with-unit">
+            <input
+              id="profileManagementFee"
+              type="number"
+              min="0"
+              step="100"
+              inputmode="numeric"
+              placeholder="8000">
+            <span>円/月</span>
+          </div>
+        </label>
+
+        <label class="profile-field">
+          <span>専有面積</span>
+          <div class="profile-input-with-unit">
+            <input
+              id="profileArea"
+              type="number"
+              min="0"
+              step="0.1"
+              inputmode="decimal"
+              placeholder="58.2">
+            <span>㎡</span>
+          </div>
+        </label>
+
+        <label class="profile-field">
+          <span>間取り</span>
+          <input
+            id="profileLayout"
+            type="text"
+            maxlength="30"
+            autocomplete="off"
+            placeholder="2LDK">
+        </label>
+
+        <label class="profile-field">
+          <span>築年数</span>
+          <div class="profile-input-with-unit">
+            <input
+              id="profileBuildingAge"
+              type="number"
+              min="0"
+              step="1"
+              inputmode="numeric"
+              placeholder="7">
+            <span>年</span>
+          </div>
+        </label>
+
+        <label class="profile-field">
+          <span>駅徒歩</span>
+          <div class="profile-input-with-unit">
+            <input
+              id="profileStationWalk"
+              type="number"
+              min="0"
+              step="1"
+              inputmode="numeric"
+              placeholder="8">
+            <span>分</span>
+          </div>
+        </label>
+
+        <label class="profile-field profile-field-wide">
+          <span>駐車場</span>
+          <select id="profileParking">
+            <option value="UNKNOWN">不明・未入力</option>
+            <option value="YES">あり</option>
+            <option value="NO">なし</option>
+          </select>
+        </label>
+
+        <label class="profile-field profile-field-wide">
+          <span>メモ</span>
+          <textarea
+            id="profileMemo"
+            rows="4"
+            maxlength="500"
+            placeholder="スーパーが近い、内見予定など"></textarea>
+        </label>
+      </div>
+
+      <section class="profile-calculation-preview" aria-label="自動計算">
+        <div class="profile-calculation-title">
+          <span>AUTO CALC</span>
+          <strong>自動計算</strong>
+        </div>
+
+        <div id="profileCalculationPreview" class="profile-calculation-grid"></div>
+
+        <p class="profile-calculation-note">
+          家賃と専有面積が入力されると1㎡あたり家賃を計算します。管理・共益費も入力すると実質住居費単価も表示します。
+        </p>
+      </section>
+
+      <div class="profile-dialog-actions">
+        <button
+          id="clearCandidateProfileButton"
+          class="profile-clear-button"
+          type="button">
+          入力内容をクリア
+        </button>
+
+        <div class="profile-dialog-actions-right">
+          <button
+            id="candidateProfileCancelButton"
+            class="secondary-dialog-button"
+            type="button">
+            キャンセル
+          </button>
+
+          <button
+            class="primary-dialog-button"
+            type="submit">
+            保存
+          </button>
+        </div>
       </div>
     </form>
   </dialog>
