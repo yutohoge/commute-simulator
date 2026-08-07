@@ -12,7 +12,7 @@
 <body>
   <header class="app-header">
     <div>
-      <p class="eyebrow">COMMUTE SIMULATOR v1.3</p>
+      <p class="eyebrow">COMMUTE SIMULATOR v1.3.1</p>
       <h1>通勤・移動時間シミュレーター</h1>
     </div>
     <button id="resetButton" class="subtle-button" type="button">初期化</button>
@@ -161,7 +161,18 @@
             <p class="eyebrow">TIME MATRIX</p>
             <h2>時間帯比較</h2>
           </div>
-          <span id="timeCompareDate" class="candidate-count">未実行</span>
+
+          <div class="time-compare-header-actions">
+            <span id="timeCompareDate" class="candidate-count">未実行</span>
+
+            <button
+              id="expandTimeCompareButton"
+              class="time-compare-expand-button hidden"
+              type="button"
+              aria-haspopup="dialog">
+              拡大表示
+            </button>
+          </div>
         </div>
 
         <p class="candidate-storage-note">
@@ -237,6 +248,45 @@
       </details>
     </section>
   </main>
+
+  <dialog id="timeCompareDialog" class="time-compare-dialog">
+    <div class="time-compare-dialog-shell">
+      <header class="time-compare-dialog-header">
+        <div>
+          <p class="eyebrow">TIME MATRIX</p>
+          <h2>時間帯比較 — 拡大表示</h2>
+          <p id="expandedTimeCompareCondition" class="expanded-time-condition"></p>
+        </div>
+
+        <div class="time-compare-dialog-header-actions">
+          <span id="expandedTimeCompareDate" class="candidate-count"></span>
+
+          <button
+            id="closeTimeCompareDialogButton"
+            class="dialog-close-button"
+            type="button"
+            aria-label="拡大表示を閉じる">
+            ×
+          </button>
+        </div>
+      </header>
+
+      <div class="expanded-time-api-note">
+        表示専用です。拡大・縮小ではRoutes APIを呼びません。
+      </div>
+
+      <div class="expanded-time-table-wrap">
+        <table class="time-compare-table expanded-time-table">
+          <thead>
+            <tr id="expandedTimeCompareHeadRow"></tr>
+          </thead>
+          <tbody id="expandedTimeCompareBody"></tbody>
+        </table>
+      </div>
+
+      <div id="expandedTimeCompareSummary" class="time-compare-summary expanded-time-summary"></div>
+    </div>
+  </dialog>
 
   <dialog id="candidateDialog" class="candidate-dialog">
     <form id="candidateForm" class="candidate-dialog-form">

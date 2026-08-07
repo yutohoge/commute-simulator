@@ -80,6 +80,15 @@ const el = {
   timeCompareSummary: document.getElementById("timeCompareSummary"),
   clearTimeCompareButton: document.getElementById("clearTimeCompareButton"),
 
+  expandTimeCompareButton: document.getElementById("expandTimeCompareButton"),
+  timeCompareDialog: document.getElementById("timeCompareDialog"),
+  closeTimeCompareDialogButton: document.getElementById("closeTimeCompareDialogButton"),
+  expandedTimeCompareDate: document.getElementById("expandedTimeCompareDate"),
+  expandedTimeCompareCondition: document.getElementById("expandedTimeCompareCondition"),
+  expandedTimeCompareHeadRow: document.getElementById("expandedTimeCompareHeadRow"),
+  expandedTimeCompareBody: document.getElementById("expandedTimeCompareBody"),
+  expandedTimeCompareSummary: document.getElementById("expandedTimeCompareSummary"),
+
   timeSlotInputs: document.getElementById("timeSlotInputs"),
   addTimeSlotButton: document.getElementById("addTimeSlotButton"),
   resetTimeSlotsButton: document.getElementById("resetTimeSlotsButton")
@@ -1396,6 +1405,69 @@ function calculateRowStats(row) {
   };
 }
 
+
+function syncExpandedTimeComparison() {
+  const hasResult =
+    Boolean(
+      state.timeComparison?.rows?.length
+    );
+
+  el.expandTimeCompareButton.classList.toggle(
+    "hidden",
+    !hasResult
+  );
+
+  if (!hasResult) {
+    el.expandedTimeCompareDate.textContent = "";
+    el.expandedTimeCompareCondition.textContent = "";
+    el.expandedTimeCompareHeadRow.replaceChildren();
+    el.expandedTimeCompareBody.replaceChildren();
+    el.expandedTimeCompareSummary.textContent = "";
+
+    if (el.timeCompareDialog.open) {
+      el.timeCompareDialog.close();
+    }
+
+    return;
+  }
+
+  el.expandedTimeCompareDate.textContent =
+    el.timeCompareDate.textContent;
+
+  el.expandedTimeCompareCondition.textContent =
+    state.timeComparison.conditionLabel ||
+    "保存した候補の時間帯比較";
+
+  el.expandedTimeCompareHeadRow.innerHTML =
+    el.timeCompareHeadRow.innerHTML;
+
+  el.expandedTimeCompareBody.innerHTML =
+    el.timeCompareBody.innerHTML;
+
+  el.expandedTimeCompareSummary.textContent =
+    el.timeCompareSummary.textContent;
+}
+
+function openExpandedTimeComparison() {
+  if (
+    !state.timeComparison?.rows?.length
+  ) {
+    return;
+  }
+
+  syncExpandedTimeComparison();
+
+  if (!el.timeCompareDialog.open) {
+    el.timeCompareDialog.showModal();
+  }
+}
+
+function closeExpandedTimeComparison() {
+  if (el.timeCompareDialog.open) {
+    el.timeCompareDialog.close();
+  }
+}
+
 function renderTimeComparison() {
   updateTimeCompareControls();
 
@@ -1452,6 +1524,7 @@ function renderTimeComparison() {
 
     el.timeCompareBody.replaceChildren();
     el.timeCompareSummary.textContent = "";
+    syncExpandedTimeComparison();
     return;
   }
 
@@ -1694,6 +1767,8 @@ function renderTimeComparison() {
     el.timeCompareSummary.textContent =
       "時間帯比較の結果を取得できませんでした。";
   }
+
+  syncExpandedTimeComparison();
 }
 
 async function computeCandidateTimeSlot(
@@ -2575,6 +2650,33 @@ function bindEvents() {
       setStatus(
         "候補をすべて削除しました。"
       );
+    }
+  );
+
+  el.expandTimeCompareButton.addEventListener(
+    "click",
+    openExpandedTimeComparison
+  );
+
+  el.closeTimeCompareDialogButton.addEventListener(
+    "click",
+    closeExpandedTimeComparison
+  );
+
+  el.timeCompareDialog.addEventListener(
+    "click",
+    (event) => {
+      if (event.target === el.timeCompareDialog) {
+        closeExpandedTimeComparison();
+      }
+    }
+  );
+
+  el.timeCompareDialog.addEventListener(
+    "cancel",
+    (event) => {
+      event.preventDefault();
+      closeExpandedTimeComparison();
     }
   );
 
