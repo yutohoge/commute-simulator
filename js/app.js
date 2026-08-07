@@ -15,6 +15,7 @@ const state = {
   polylines: [],
   origin: null,
   originLabel: "",
+  originAddress: "",
   destination: {
     label: CONFIG.DEFAULT_DESTINATION.label,
     address: CONFIG.DEFAULT_DESTINATION.address,
@@ -215,6 +216,7 @@ function createOriginMarker(location, label) {
 
     state.origin = literal;
     state.originLabel = "ピンを移動した出発地";
+    state.originAddress = "";
     el.originLabel.textContent = state.originLabel;
 
     if (state.originAutocompleteControl) {
@@ -278,6 +280,12 @@ function setOrigin(location, label, options = {}) {
   };
 
   state.originLabel = label;
+  state.originAddress =
+    typeof options.address ===
+      "string"
+      ? options.address.trim()
+      : "";
+
   el.originLabel.textContent = label;
   el.searchButton.disabled = false;
 
@@ -392,6 +400,16 @@ function loadCandidates() {
         ? parsed.map(
             (candidate) => ({
               ...candidate,
+
+              originLabel:
+                typeof candidate.originLabel === "string"
+                  ? candidate.originLabel
+                  : candidate.name || "",
+
+              originAddress:
+                typeof candidate.originAddress === "string"
+                  ? candidate.originAddress
+                  : "",
 
               profile:
                 normalizeCandidateProfile(
@@ -565,7 +583,7 @@ function trafficAdjustmentLabel(minutes) {
 
 
 
-const NEARBY_SEARCH_RADIUS_METERS = 3000;
+const NEARBY_SEARCH_RADIUS_METERS = 1500;
 const NEARBY_SEARCH_MAX_RESULTS = 20;
 
 const NEARBY_FACILITY_CATEGORIES = [
@@ -621,14 +639,47 @@ const NEARBY_FACILITY_CATEGORIES = [
   }
 ];
 
-const NEARBY_INCLUDED_TYPES =
-  [...new Set(
-    NEARBY_FACILITY_CATEGORIES
-      .flatMap(
-        (category) =>
-          category.types
+const NEARBY_SEARCH_GROUPS = [
+  {
+    key: "life",
+    label: "生活施設",
+    categoryKeys: [
+      "supermarket",
+      "convenience",
+      "drugstore",
+      "gym"
+    ]
+  },
+  {
+    key: "transit",
+    label: "交通施設",
+    categoryKeys: [
+      "railStation",
+      "busStop"
+    ]
+  }
+];
+
+function nearbyCategoriesForGroup(group) {
+  return NEARBY_FACILITY_CATEGORIES.filter(
+    (category) =>
+      group.categoryKeys.includes(
+        category.key
       )
-  )];
+  );
+}
+
+function nearbyIncludedTypesForGroup(group) {
+  return [
+    ...new Set(
+      nearbyCategoriesForGroup(group)
+        .flatMap(
+          (category) =>
+            category.types
+        )
+    )
+  ];
+}
 
 function normalizeNearbyFacility(facility) {
   if (
@@ -700,7 +751,16 @@ function normalizeNearbyData(nearby) {
   );
 
   return {
-    version: 1,
+    version:
+      Number.isFinite(
+        Number(
+          nearby.version
+        )
+      )
+        ? Number(
+            nearby.version
+          )
+        : 1,
 
     radiusMeters:
       Number.isFinite(
@@ -712,6 +772,16 @@ function normalizeNearbyData(nearby) {
             nearby.radiusMeters
           )
         : NEARBY_SEARCH_RADIUS_METERS,
+
+    searchGroups:
+      Array.isArray(
+        nearby.searchGroups
+      )
+        ? nearby.searchGroups.filter(
+            (value) =>
+              typeof value === "string"
+          )
+        : [],
 
     searchedAt:
       typeof nearby.searchedAt === "string"
@@ -989,104 +1059,123 @@ async function searchNearbyFacilities(
         "places"
       );
 
-    const request = {
-      fields: [
-        "displayName",
-        "location",
-        "googleMapsURI",
-        "types",
-        "primaryType"
-      ],
-
-      locationRestriction: {
-        center:
-          candidate.origin,
-
-        radius:
-          NEARBY_SEARCH_RADIUS_METERS
-      },
-
-      includedTypes:
-        NEARBY_INCLUDED_TYPES,
-
-      maxResultCount:
-        NEARBY_SEARCH_MAX_RESULTS,
-
-      rankPreference:
-        SearchNearbyRankPreference.DISTANCE,
-
-      language:
-        "ja",
-
-      region:
-        "JP"
-    };
-
-    const { places } =
-      await Place.searchNearby(
-        request
-      );
-
-    const normalizedPlaces =
-      (places || [])
-        .map(
-          (place) => ({
-            place,
-            facility:
-              plainNearbyFacility(
-                candidate,
-                place
-              )
-          })
-        )
-        .filter(
-          (item) =>
-            item.facility.location
-        )
-        .sort(
-          (a, b) =>
-            (
-              a.facility
-                .distanceMeters ??
-              Infinity
-            ) -
-            (
-              b.facility
-                .distanceMeters ??
-              Infinity
-            )
-        );
-
     const facilities = {};
 
-    NEARBY_FACILITY_CATEGORIES.forEach(
-      (category) => {
-        const match =
-          normalizedPlaces.find(
-            ({ place }) =>
-              placeMatchesCategory(
-                place,
-                category
+    for (
+      const group of
+      NEARBY_SEARCH_GROUPS
+    ) {
+      const categories =
+        nearbyCategoriesForGroup(
+          group
+        );
+
+      const request = {
+        fields: [
+          "displayName",
+          "location",
+          "googleMapsURI",
+          "types",
+          "primaryType"
+        ],
+
+        locationRestriction: {
+          center:
+            candidate.origin,
+
+          radius:
+            NEARBY_SEARCH_RADIUS_METERS
+        },
+
+        includedTypes:
+          nearbyIncludedTypesForGroup(
+            group
+          ),
+
+        maxResultCount:
+          NEARBY_SEARCH_MAX_RESULTS,
+
+        rankPreference:
+          SearchNearbyRankPreference.DISTANCE,
+
+        language:
+          "ja",
+
+        region:
+          "JP"
+      };
+
+      const { places } =
+        await Place.searchNearby(
+          request
+        );
+
+      const normalizedPlaces =
+        (places || [])
+          .map(
+            (place) => ({
+              place,
+              facility:
+                plainNearbyFacility(
+                  candidate,
+                  place
+                )
+            })
+          )
+          .filter(
+            (item) =>
+              item.facility.location
+          )
+          .sort(
+            (a, b) =>
+              (
+                a.facility
+                  .distanceMeters ??
+                Infinity
+              ) -
+              (
+                b.facility
+                  .distanceMeters ??
+                Infinity
               )
           );
 
-        facilities[
-          category.key
-        ] =
-          match
-            ? match.facility
-            : null;
-      }
-    );
+      categories.forEach(
+        (category) => {
+          const match =
+            normalizedPlaces.find(
+              ({ place }) =>
+                placeMatchesCategory(
+                  place,
+                  category
+                )
+            );
+
+          facilities[
+            category.key
+          ] =
+            match
+              ? match.facility
+              : null;
+        }
+      );
+    }
 
     candidate.nearby = {
-      version: 1,
+      version: 2,
       radiusMeters:
         NEARBY_SEARCH_RADIUS_METERS,
+      searchGroups:
+        NEARBY_SEARCH_GROUPS.map(
+          (group) =>
+            group.key
+        ),
       searchedAt:
         new Date().toISOString(),
       facilities
     };
+
+    candidate.nearbyError = "";
 
     persistCandidates();
     renderCandidates();
@@ -1119,7 +1208,17 @@ function nearbyDataIsCurrent(nearby) {
   return Boolean(
     nearby &&
     Number(nearby.radiusMeters) ===
-      NEARBY_SEARCH_RADIUS_METERS
+      NEARBY_SEARCH_RADIUS_METERS &&
+    Number(nearby.version) >= 2 &&
+    Array.isArray(
+      nearby.searchGroups
+    ) &&
+    nearby.searchGroups.includes(
+      "life"
+    ) &&
+    nearby.searchGroups.includes(
+      "transit"
+    )
   );
 }
 
@@ -1164,10 +1263,10 @@ function renderCandidateNearbyPanel(
       "nearby-search-intro";
 
     intro.textContent =
-      `検索範囲を3.0kmへ拡大しました。旧${(
+      `周辺検索を1.5km・2分割検索へ更新しました。旧${(
         nearby.radiusMeters /
         1000
-      ).toFixed(1)}kmの結果は総合スコアには使用しません。3.0kmで再検索してください。`;
+      ).toFixed(1)}km / 旧検索方式の結果は総合スコアには使用しません。再検索してください。`;
 
     const button =
       document.createElement(
@@ -1181,7 +1280,7 @@ function renderCandidateNearbyPanel(
       "nearby-search-button";
 
     button.textContent =
-      "3kmで周辺施設を再検索（Places API 1回）";
+      "1.5kmで周辺施設を再検索（Places API 2回）";
 
     button.addEventListener(
       "click",
@@ -1249,7 +1348,7 @@ function renderCandidateNearbyPanel(
       "nearby-search-button";
 
     button.textContent =
-      "周辺施設を検索（Places API 1回）";
+      "周辺施設を検索（Places API 2回）";
 
     button.addEventListener(
       "click",
@@ -1440,7 +1539,7 @@ function renderCandidateNearbyPanel(
     "nearby-search-button";
 
   refreshButton.textContent =
-    "周辺施設を再検索（Places API 1回）";
+    "周辺施設を再検索（Places API 2回）";
 
   refreshButton.addEventListener(
     "click",
@@ -3144,6 +3243,39 @@ function candidateTotalScore(
     : null;
 }
 
+
+function candidateLocationMapsUrl(
+  candidate
+) {
+  const query =
+    candidate.originAddress ||
+    candidate.originLabel ||
+    candidate.name ||
+    `${candidate.origin.lat},${candidate.origin.lng}`;
+
+  const params =
+    new URLSearchParams({
+      api: "1",
+      query
+    });
+
+  return (
+    `https://www.google.com/maps/search/?${params.toString()}`
+  );
+}
+
+function openCandidateLocationMaps(
+  candidate
+) {
+  window.open(
+    candidateLocationMapsUrl(
+      candidate
+    ),
+    "_blank",
+    "noopener"
+  );
+}
+
 function renderCandidates() {
   const sorted = [...state.candidates].sort(
     (a, b) =>
@@ -3258,6 +3390,12 @@ function renderCandidates() {
           </button>
 
           <button
+            class="candidate-location-button"
+            type="button">
+            地点をGoogleマップで見る
+          </button>
+
+          <button
             class="candidate-transit-button"
             type="button">
             公共交通を見る
@@ -3360,9 +3498,13 @@ function renderCandidates() {
           () => {
             setOrigin(
               candidate.origin,
-              candidate.name,
+              candidate.originLabel ||
+                candidate.name,
               {
-                clearAutocomplete: true
+                clearAutocomplete: true,
+                address:
+                  candidate.originAddress ||
+                  ""
               }
             );
 
@@ -3372,6 +3514,17 @@ function renderCandidates() {
 
             setStatus(
               `「${candidate.name}」を出発地に設定しました。必要ならもう一度検索してください。`
+            );
+          }
+        );
+
+      card
+        .querySelector(".candidate-location-button")
+        .addEventListener(
+          "click",
+          () => {
+            openCandidateLocationMaps(
+              candidate
             );
           }
         );
@@ -3506,6 +3659,12 @@ function savePendingCandidate() {
       lat: state.origin.lat,
       lng: state.origin.lng
     },
+
+    originLabel:
+      state.originLabel || name,
+
+    originAddress:
+      state.originAddress || "",
 
     destination: {
       label: state.destination.label,
@@ -5255,6 +5414,7 @@ function resetApp() {
 
   state.origin = null;
   state.originLabel = "";
+  state.originAddress = "";
   state.preset = "NOW";
 
   if (state.originMarker) {
@@ -5684,7 +5844,12 @@ async function init() {
       createAutocomplete(
         el.originAutocomplete,
         "出発地の住所・駅・施設を検索",
-        ({ location, label }) => setOrigin(location, label)
+        ({ location, label, address }) =>
+          setOrigin(
+            location,
+            label,
+            { address }
+          )
       ),
       createAutocomplete(
         el.destinationAutocomplete,

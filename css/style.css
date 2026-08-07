@@ -1964,3 +1964,36 @@ details { margin-top: 15px; color: var(--muted); font-size: .76rem; line-height:
     flex-direction: column;
   }
 }
+
+
+/* =========================================================
+   Candidate Google Maps link - v2.2.1
+========================================================= */
+
+.candidate-location-button {
+  min-height: 35px;
+  border: 1px solid #cbd8ea;
+  border-radius: 9px;
+  background: #f8fbff;
+  color: #31557b;
+  font-size: .71rem;
+  font-weight: 750;
+}
+
+.candidate-actions {
+  grid-template-columns: 1fr 1fr;
+}
+
+.candidate-delete-button {
+  grid-column: auto;
+}
+
+@media (max-width: 760px) {
+  .candidate-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .candidate-delete-button {
+    grid-column: auto;
+  }
+}
