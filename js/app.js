@@ -561,7 +561,6 @@ const NEARBY_FACILITY_CATEGORIES = [
     label: "スーパー",
     types: [
       "supermarket",
-      "grocery_store",
       "discount_supermarket",
       "hypermarket"
     ]
@@ -837,6 +836,15 @@ function placeMatchesCategory(
       ? place.types
       : [];
 
+  if (
+    category.key ===
+    "supermarket"
+  ) {
+    return category.types.includes(
+      place.primaryType
+    );
+  }
+
   return category.types.some(
     (type) =>
       types.includes(type)
@@ -973,7 +981,8 @@ async function searchNearbyFacilities(
         "displayName",
         "location",
         "googleMapsURI",
-        "types"
+        "types",
+        "primaryType"
       ],
 
       locationRestriction: {

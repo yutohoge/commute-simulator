@@ -1,4 +1,4 @@
-# Commute Simulator v2.1.1 — 交通施設分類の改善
+# Commute Simulator v2.1.2 — スーパー検索の改善
 
 GitHubで上書きするファイル:
 
@@ -8,28 +8,30 @@ GitHubで上書きするファイル:
 css/style.css は変更なしです。
 config.js とAPIキーも変更不要です。
 
-## v2.1.1変更内容
+## v2.1.2変更内容
 
-周辺施設の交通カテゴリを整理しました。
+周辺施設の「スーパー」判定をシンプルに改善しました。
 
 旧:
-- 鉄道駅
-  - train_station
-  - subway_station
-  - light_rail_station
-  - transit_station
+- supermarket
+- grocery_store
+- discount_supermarket
+- hypermarket
 
 新:
-- 電車・地下鉄駅
-  - train_station
-  - subway_station
-  - light_rail_station
+- supermarket
+- discount_supermarket
+- hypermarket
 
-- バス停
-  - bus_stop
-  - bus_station
+`grocery_store` は小規模な食料品店や個人商店も拾いやすいため、
+スーパー候補から除外しました。
 
-`transit_station` は分類が曖昧で、バス停が鉄道駅として表示される原因になるため検索対象から外しました。
+さらに、スーパーについては
+`place.primaryType` が上記スーパー系typeのいずれかである施設だけを採用します。
+
+これにより、
+「たまたま grocery 系typeを持つ小規模店舗」よりも
+日常のまとめ買い先として使いやすいスーパーを拾いやすくします。
 
 ## API利用
 
@@ -38,14 +40,14 @@ config.js とAPIキーも変更不要です。
 「周辺施設を検索」1回につき:
 - Nearby Search 1回
 
-6カテゴリを1回の検索でまとめて取得します。
+追加取得する `primaryType` も同じNearby Searchのfieldsに含めるだけなので、
+検索回数は増えません。
 
-対象カテゴリ:
-- スーパー
-- コンビニ
-- ドラッグストア
-- ジム
+## そのほか
+
+v2.1.1の交通施設分類もそのまま維持しています。
+
 - 電車・地下鉄駅
 - バス停
 
-表示やカテゴリ分けだけでは追加のAPIリクエストは発生しません。
+`transit_station` は引き続き除外しています。
