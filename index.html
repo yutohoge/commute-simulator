@@ -12,7 +12,7 @@
 <body>
   <header class="app-header">
     <div>
-      <p class="eyebrow">COMMUTE SIMULATOR v1.1.1</p>
+      <p class="eyebrow">COMMUTE SIMULATOR v1.2</p>
       <h1>通勤・移動時間シミュレーター</h1>
     </div>
     <button id="resetButton" class="subtle-button" type="button">初期化</button>
@@ -140,6 +140,64 @@
         <button id="clearCandidatesButton" class="candidate-clear-button hidden" type="button">
           候補をすべて削除
         </button>
+      </section>
+
+
+      <section class="time-compare-section" aria-label="時間帯比較">
+        <div class="candidate-header">
+          <div>
+            <p class="eyebrow">TIME MATRIX</p>
+            <h2>時間帯比較</h2>
+          </div>
+          <span id="timeCompareDate" class="candidate-count">未実行</span>
+        </div>
+
+        <p class="candidate-storage-note">
+          保存した候補を、同じ目的地・同じ車ルート設定で比較します。
+        </p>
+
+        <div id="timeCompareEmpty" class="time-compare-empty">
+          候補を1件以上追加すると、次の平日の 7:30 / 8:00 / 18:00 を一括比較できます。
+        </div>
+
+        <div id="timeCompareControls" class="time-compare-controls hidden">
+          <div id="timeCompareApiEstimate" class="time-compare-api-estimate"></div>
+
+          <button id="runTimeCompareButton" class="time-compare-run-button" type="button">
+            3時間帯を一括比較
+          </button>
+
+          <p class="time-compare-note">
+            このボタンを押したときだけRoutes APIを呼びます。同じ条件の再実行は30分キャッシュを利用します。
+          </p>
+        </div>
+
+        <div id="timeCompareStatus" class="time-compare-status hidden" aria-live="polite"></div>
+
+        <div id="timeCompareResult" class="time-compare-result hidden">
+          <div class="time-compare-table-wrap">
+            <table class="time-compare-table">
+              <thead>
+                <tr>
+                  <th>候補</th>
+                  <th>7:30</th>
+                  <th>8:00</th>
+                  <th>18:00</th>
+                  <th>平均</th>
+                  <th>最大</th>
+                  <th>ブレ</th>
+                </tr>
+              </thead>
+              <tbody id="timeCompareBody"></tbody>
+            </table>
+          </div>
+
+          <div id="timeCompareSummary" class="time-compare-summary"></div>
+
+          <button id="clearTimeCompareButton" class="candidate-clear-button" type="button">
+            時間帯比較をクリア
+          </button>
+        </div>
       </section>
 
       <details>

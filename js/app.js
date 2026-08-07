@@ -24,7 +24,8 @@ const state = {
   mapSelectionTarget: "ORIGIN",
   lastResults: [],
   candidates: [],
-  pendingCandidate: null
+  pendingCandidate: null,
+  timeComparison: null
 };
 
 const el = {
@@ -63,7 +64,18 @@ const el = {
   candidateNameInput: document.getElementById("candidateNameInput"),
   candidateDialogSummary: document.getElementById("candidateDialogSummary"),
   candidateDialogClose: document.getElementById("candidateDialogClose"),
-  candidateCancelButton: document.getElementById("candidateCancelButton")
+  candidateCancelButton: document.getElementById("candidateCancelButton"),
+
+  timeCompareDate: document.getElementById("timeCompareDate"),
+  timeCompareEmpty: document.getElementById("timeCompareEmpty"),
+  timeCompareControls: document.getElementById("timeCompareControls"),
+  timeCompareApiEstimate: document.getElementById("timeCompareApiEstimate"),
+  runTimeCompareButton: document.getElementById("runTimeCompareButton"),
+  timeCompareStatus: document.getElementById("timeCompareStatus"),
+  timeCompareResult: document.getElementById("timeCompareResult"),
+  timeCompareBody: document.getElementById("timeCompareBody"),
+  timeCompareSummary: document.getElementById("timeCompareSummary"),
+  clearTimeCompareButton: document.getElementById("clearTimeCompareButton")
 };
 
 function setStatus(message, type = "") {
@@ -775,6 +787,818 @@ function savePendingCandidate() {
 }
 
 
+
+/* =========================================================
+   Time comparison - v1.2
+========================================================= */
+
+const TIME_COMPARISON_STORAGE_KEY =
+  "commuteSimulatorTimeComparisonV1_2";
+
+const TIME_SLOTS = [
+  { key: "0730", label: "7:30", hour: 7, minute: 30 },
+  { key: "0800", label: "8:00", hour: 8, minute: 0 },
+  { key: "1800", label: "18:00", hour: 18, minute: 0 }
+];
+
+function nextWeekdayForBatch() {
+  const result = new Date();
+  result.setHours(12, 0, 0, 0);
+  result.setDate(result.getDate() + 1);
+
+  while (
+    result.getDay() === 0 ||
+    result.getDay() === 6
+  ) {
+    result.setDate(result.getDate() + 1);
+  }
+
+  return result;
+}
+
+function departureForBatch(baseDate, slot) {
+  const result = new Date(baseDate);
+
+  result.setHours(
+    slot.hour,
+    slot.minute,
+    0,
+    0
+  );
+
+  return result;
+}
+
+function formatBatchDate(date) {
+  return new Intl.DateTimeFormat(
+    "ja-JP",
+    {
+      month: "numeric",
+      day: "numeric",
+      weekday: "short"
+    }
+  ).format(date);
+}
+
+function batchConditionSignature(baseDate) {
+  return JSON.stringify({
+    candidateOrigins: state.candidates
+      .map((candidate) => ({
+        id: candidate.id,
+        lat: Number(candidate.origin.lat).toFixed(5),
+        lng: Number(candidate.origin.lng).toFixed(5)
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+
+    destination: {
+      lat: Number(state.destination.location.lat).toFixed(5),
+      lng: Number(state.destination.location.lng).toFixed(5),
+      label: state.destination.label
+    },
+
+    date: baseDate.toISOString().slice(0, 10),
+
+    avoidTolls: el.avoidTolls.checked,
+    avoidHighways: el.avoidHighways.checked,
+    avoidFerries: el.avoidFerries.checked
+  });
+}
+
+function batchConditionLabel(baseDate) {
+  const routeOptions = [];
+
+  if (el.avoidTolls.checked) {
+    routeOptions.push("有料道路回避");
+  }
+
+  if (el.avoidHighways.checked) {
+    routeOptions.push("高速回避");
+  }
+
+  if (el.avoidFerries.checked) {
+    routeOptions.push("フェリー回避");
+  }
+
+  return [
+    `${state.destination.label}まで`,
+    formatBatchDate(baseDate),
+    routeOptions.length
+      ? routeOptions.join("・")
+      : "標準ルート"
+  ].join(" / ");
+}
+
+function loadTimeComparison() {
+  const raw =
+    safeSessionStorageGet(
+      TIME_COMPARISON_STORAGE_KEY
+    );
+
+  if (!raw) {
+    state.timeComparison = null;
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+
+    state.timeComparison =
+      parsed &&
+      Array.isArray(parsed.rows)
+        ? parsed
+        : null;
+  } catch {
+    state.timeComparison = null;
+  }
+}
+
+function persistTimeComparison() {
+  if (!state.timeComparison) {
+    try {
+      sessionStorage.removeItem(
+        TIME_COMPARISON_STORAGE_KEY
+      );
+    } catch {
+      // no-op
+    }
+
+    return;
+  }
+
+  safeSessionStorageSet(
+    TIME_COMPARISON_STORAGE_KEY,
+    JSON.stringify(
+      state.timeComparison
+    )
+  );
+}
+
+function clearTimeComparison() {
+  state.timeComparison = null;
+  persistTimeComparison();
+  renderTimeComparison();
+}
+
+function updateTimeCompareControls() {
+  const count = state.candidates.length;
+
+  el.timeCompareEmpty.classList.toggle(
+    "hidden",
+    count > 0
+  );
+
+  el.timeCompareControls.classList.toggle(
+    "hidden",
+    count === 0
+  );
+
+  if (count > 0) {
+    const maxRequests =
+      count * TIME_SLOTS.length;
+
+    el.timeCompareApiEstimate.textContent =
+      `候補${count}件 × 3時間帯 = 最大${maxRequests}回の経路計算。候補追加や表を見るだけではAPIを呼びません。`;
+
+    el.runTimeCompareButton.textContent =
+      `3時間帯を一括比較（最大${maxRequests}回）`;
+  }
+}
+
+function comparisonMinutes(value) {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.max(
+    1,
+    Math.round(value / 60000)
+  );
+}
+
+function average(values) {
+  const valid =
+    values.filter(Number.isFinite);
+
+  if (!valid.length) {
+    return null;
+  }
+
+  return valid.reduce(
+    (sum, value) => sum + value,
+    0
+  ) / valid.length;
+}
+
+function calculateRowStats(row) {
+  const values = TIME_SLOTS
+    .map(
+      (slot) =>
+        row.times[slot.key]?.durationMillis
+    )
+    .filter(Number.isFinite);
+
+  if (!values.length) {
+    return {
+      averageMillis: null,
+      maxMillis: null,
+      minMillis: null,
+      spreadMillis: null
+    };
+  }
+
+  const averageMillis =
+    average(values);
+
+  const maxMillis =
+    Math.max(...values);
+
+  const minMillis =
+    Math.min(...values);
+
+  return {
+    averageMillis,
+    maxMillis,
+    minMillis,
+    spreadMillis:
+      maxMillis - minMillis
+  };
+}
+
+function renderTimeComparison() {
+  updateTimeCompareControls();
+
+  const comparison =
+    state.timeComparison;
+
+  if (!comparison?.rows?.length) {
+    el.timeCompareDate.textContent =
+      "未実行";
+
+    el.timeCompareResult.classList.add(
+      "hidden"
+    );
+
+    el.timeCompareBody.replaceChildren();
+    el.timeCompareSummary.textContent = "";
+    return;
+  }
+
+  el.timeCompareResult.classList.remove(
+    "hidden"
+  );
+
+  const baseDate =
+    new Date(
+      `${comparison.date}T12:00:00`
+    );
+
+  el.timeCompareDate.textContent =
+    formatBatchDate(baseDate);
+
+  const rows =
+    comparison.rows.map((row) => ({
+      ...row,
+      stats:
+        calculateRowStats(row)
+    }));
+
+  rows.sort((a, b) => {
+    const aValue =
+      a.stats.averageMillis ??
+      Infinity;
+
+    const bValue =
+      b.stats.averageMillis ??
+      Infinity;
+
+    return aValue - bValue;
+  });
+
+  const finiteAverages =
+    rows
+      .map(
+        (row) =>
+          row.stats.averageMillis
+      )
+      .filter(Number.isFinite);
+
+  const bestAverage =
+    finiteAverages.length
+      ? Math.min(...finiteAverages)
+      : null;
+
+  const bestPerSlot = {};
+
+  TIME_SLOTS.forEach((slot) => {
+    const values =
+      rows
+        .map(
+          (row) =>
+            row.times[slot.key]
+              ?.durationMillis
+        )
+        .filter(Number.isFinite);
+
+    bestPerSlot[slot.key] =
+      values.length
+        ? Math.min(...values)
+        : null;
+  });
+
+  el.timeCompareBody.replaceChildren();
+
+  rows.forEach((row) => {
+    const tr =
+      document.createElement("tr");
+
+    if (
+      Number.isFinite(bestAverage) &&
+      row.stats.averageMillis ===
+        bestAverage
+    ) {
+      tr.classList.add("best-row");
+    }
+
+    const nameCell =
+      document.createElement("td");
+
+    const nameSpan =
+      document.createElement("span");
+
+    nameSpan.className =
+      "time-compare-name";
+
+    nameSpan.textContent =
+      row.name;
+
+    nameCell.appendChild(nameSpan);
+    tr.appendChild(nameCell);
+
+    TIME_SLOTS.forEach((slot) => {
+      const td =
+        document.createElement("td");
+
+      const result =
+        row.times[slot.key];
+
+      if (
+        result &&
+        Number.isFinite(
+          result.durationMillis
+        )
+      ) {
+        td.textContent =
+          `${comparisonMinutes(
+            result.durationMillis
+          )}分`;
+
+        if (
+          bestPerSlot[slot.key] ===
+          result.durationMillis
+        ) {
+          td.classList.add(
+            "best-cell"
+          );
+        }
+      } else {
+        td.textContent = "取得失敗";
+        td.classList.add(
+          "failed-cell"
+        );
+      }
+
+      tr.appendChild(td);
+    });
+
+    const averageCell =
+      document.createElement("td");
+
+    averageCell.textContent =
+      Number.isFinite(
+        row.stats.averageMillis
+      )
+        ? `${comparisonMinutes(
+            row.stats.averageMillis
+          )}分`
+        : "—";
+
+    if (
+      Number.isFinite(bestAverage) &&
+      row.stats.averageMillis ===
+        bestAverage
+    ) {
+      averageCell.classList.add(
+        "best-cell"
+      );
+    }
+
+    tr.appendChild(averageCell);
+
+    const maxCell =
+      document.createElement("td");
+
+    maxCell.textContent =
+      Number.isFinite(
+        row.stats.maxMillis
+      )
+        ? `${comparisonMinutes(
+            row.stats.maxMillis
+          )}分`
+        : "—";
+
+    tr.appendChild(maxCell);
+
+    const spreadCell =
+      document.createElement("td");
+
+    spreadCell.textContent =
+      Number.isFinite(
+        row.stats.spreadMillis
+      )
+        ? `${Math.round(
+            row.stats.spreadMillis /
+            60000
+          )}分`
+        : "—";
+
+    tr.appendChild(spreadCell);
+
+    el.timeCompareBody.appendChild(tr);
+  });
+
+  const bestRow =
+    rows.find(
+      (row) =>
+        Number.isFinite(bestAverage) &&
+        row.stats.averageMillis ===
+          bestAverage
+    );
+
+  if (bestRow) {
+    el.timeCompareSummary.textContent =
+      `平均所要時間が最短なのは「${bestRow.name}」で約${comparisonMinutes(bestRow.stats.averageMillis)}分。` +
+      ` 最長時は約${comparisonMinutes(bestRow.stats.maxMillis)}分、時間帯によるブレは約${Math.round(bestRow.stats.spreadMillis / 60000)}分です。`;
+  } else {
+    el.timeCompareSummary.textContent =
+      "時間帯比較の結果を取得できませんでした。";
+  }
+}
+
+async function computeCandidateTimeSlot(
+  candidate,
+  slot,
+  baseDate
+) {
+  const departureTime =
+    departureForBatch(
+      baseDate,
+      slot
+    );
+
+  const cacheParams = {
+    origin:
+      candidate.origin,
+
+    destination:
+      state.destination.location,
+
+    mode:
+      "DRIVING",
+
+    departureTime,
+
+    avoidTolls:
+      el.avoidTolls.checked,
+
+    avoidHighways:
+      el.avoidHighways.checked,
+
+    avoidFerries:
+      el.avoidFerries.checked
+  };
+
+  const key =
+    createCacheKey(
+      cacheParams
+    );
+
+  const cached =
+    getCachedResult(key);
+
+  if (
+    cached?.route &&
+    Number.isFinite(
+      cached.route.durationMillis
+    )
+  ) {
+    return {
+      durationMillis:
+        cached.route.durationMillis,
+
+      staticDurationMillis:
+        cached.route.staticDurationMillis,
+
+      distanceMeters:
+        cached.route.distanceMeters,
+
+      fromCache:
+        true
+    };
+  }
+
+  const request = {
+    origin:
+      candidate.origin,
+
+    destination:
+      state.destination.location,
+
+    travelMode:
+      "DRIVING",
+
+    departureTime,
+
+    routingPreference:
+      "TRAFFIC_AWARE_OPTIMAL",
+
+    routeModifiers: {
+      avoidTolls:
+        el.avoidTolls.checked,
+
+      avoidHighways:
+        el.avoidHighways.checked,
+
+      avoidFerries:
+        el.avoidFerries.checked
+    },
+
+    fields: [
+      "durationMillis",
+      "staticDurationMillis",
+      "distanceMeters"
+    ]
+  };
+
+  const { routes } =
+    await state.Route.computeRoutes(
+      request
+    );
+
+  if (!routes?.length) {
+    throw new Error(
+      "経路が見つかりませんでした。"
+    );
+  }
+
+  const route =
+    routes[0];
+
+  storeCachedResult(
+    key,
+    {
+      mode: "DRIVING",
+      route,
+      departureTime,
+      fromCache: false
+    }
+  );
+
+  return {
+    durationMillis:
+      route.durationMillis,
+
+    staticDurationMillis:
+      route.staticDurationMillis,
+
+    distanceMeters:
+      route.distanceMeters,
+
+    fromCache:
+      false
+  };
+}
+
+async function runWithConcurrency(
+  jobs,
+  concurrency = 4
+) {
+  const results =
+    new Array(jobs.length);
+
+  let nextIndex = 0;
+
+  async function worker() {
+    while (true) {
+      const index =
+        nextIndex++;
+
+      if (index >= jobs.length) {
+        return;
+      }
+
+      try {
+        results[index] = {
+          status: "fulfilled",
+          value:
+            await jobs[index]()
+        };
+      } catch (error) {
+        results[index] = {
+          status: "rejected",
+          reason: error
+        };
+      }
+    }
+  }
+
+  const workers =
+    Array.from(
+      {
+        length:
+          Math.min(
+            concurrency,
+            jobs.length
+          )
+      },
+      () => worker()
+    );
+
+  await Promise.all(workers);
+
+  return results;
+}
+
+async function runTimeComparison() {
+  if (!state.candidates.length) {
+    return;
+  }
+
+  const baseDate =
+    nextWeekdayForBatch();
+
+  const signature =
+    batchConditionSignature(
+      baseDate
+    );
+
+  const maxRequests =
+    state.candidates.length *
+    TIME_SLOTS.length;
+
+  el.runTimeCompareButton.disabled =
+    true;
+
+  el.timeCompareStatus.classList.remove(
+    "hidden",
+    "error"
+  );
+
+  el.timeCompareStatus.textContent =
+    `時間帯比較を実行中… 最大${maxRequests}回の経路計算です。`;
+
+  const rows =
+    state.candidates.map(
+      (candidate) => ({
+        id: candidate.id,
+        name: candidate.name,
+        origin: candidate.origin,
+        times: {}
+      })
+    );
+
+  const jobs = [];
+
+  rows.forEach((row) => {
+    TIME_SLOTS.forEach((slot) => {
+      jobs.push({
+        row,
+        slot,
+        run: () =>
+          computeCandidateTimeSlot(
+            row,
+            slot,
+            baseDate
+          )
+      });
+    });
+  });
+
+  let completed = 0;
+
+  const wrappedJobs =
+    jobs.map((job) => async () => {
+      try {
+        return await job.run();
+      } finally {
+        completed += 1;
+
+        el.timeCompareStatus.textContent =
+          `時間帯比較を実行中… ${completed}/${jobs.length}`;
+      }
+    });
+
+  try {
+    const settled =
+      await runWithConcurrency(
+        wrappedJobs,
+        4
+      );
+
+    settled.forEach(
+      (result, index) => {
+        const job =
+          jobs[index];
+
+        if (
+          result.status ===
+          "fulfilled"
+        ) {
+          job.row.times[
+            job.slot.key
+          ] = result.value;
+        } else {
+          job.row.times[
+            job.slot.key
+          ] = {
+            error:
+              result.reason?.message ||
+              "取得失敗"
+          };
+        }
+      }
+    );
+
+    state.timeComparison = {
+      version: 1,
+
+      date:
+        baseDate
+          .toISOString()
+          .slice(0, 10),
+
+      createdAt:
+        new Date().toISOString(),
+
+      conditionSignature:
+        signature,
+
+      conditionLabel:
+        batchConditionLabel(
+          baseDate
+        ),
+
+      rows
+    };
+
+    persistTimeComparison();
+    renderTimeComparison();
+
+    const failedCount =
+      rows.reduce(
+        (sum, row) =>
+          sum +
+          TIME_SLOTS.filter(
+            (slot) =>
+              !Number.isFinite(
+                row.times[slot.key]
+                  ?.durationMillis
+              )
+          ).length,
+        0
+      );
+
+    if (failedCount) {
+      el.timeCompareStatus.classList.add(
+        "error"
+      );
+
+      el.timeCompareStatus.textContent =
+        `比較は完了しましたが、${failedCount}件の経路を取得できませんでした。`;
+    } else {
+      el.timeCompareStatus.classList.remove(
+        "error"
+      );
+
+      el.timeCompareStatus.textContent =
+        `比較完了：${batchConditionLabel(baseDate)}`;
+    }
+  } catch (error) {
+    console.error(error);
+
+    el.timeCompareStatus.classList.add(
+      "error"
+    );
+
+    el.timeCompareStatus.textContent =
+      error.message ||
+      "時間帯比較に失敗しました。";
+  } finally {
+    el.runTimeCompareButton.disabled =
+      false;
+  }
+}
+
+
 async function createAutocomplete(host, placeholder, onSelect) {
   const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
 
@@ -1202,6 +2026,22 @@ function bindEvents() {
     }
   );
 
+  el.runTimeCompareButton.addEventListener(
+    "click",
+    runTimeComparison
+  );
+
+  el.clearTimeCompareButton.addEventListener(
+    "click",
+    () => {
+      clearTimeComparison();
+
+      el.timeCompareStatus.classList.add(
+        "hidden"
+      );
+    }
+  );
+
   el.currentLocationButton.addEventListener("click", () => {
     if (!navigator.geolocation) {
       setStatus("このブラウザは現在地取得に対応していません。", "error");
@@ -1291,7 +2131,10 @@ async function init() {
     el.customDateTime.min = toDateTimeLocalValue(new Date(Date.now() + 60000));
 
     loadCandidates();
+    loadTimeComparison();
+
     renderCandidates();
+    renderTimeComparison();
 
     bindEvents();
     updateModeUi();
