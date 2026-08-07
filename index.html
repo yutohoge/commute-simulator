@@ -12,7 +12,7 @@
 <body>
   <header class="app-header">
     <div>
-      <p class="eyebrow">COMMUTE SIMULATOR v1.0</p>
+      <p class="eyebrow">COMMUTE SIMULATOR v1.1</p>
       <h1>通勤・移動時間シミュレーター</h1>
     </div>
     <button id="resetButton" class="subtle-button" type="button">初期化</button>
@@ -112,6 +112,36 @@
 
       <button id="openGoogleMapsButton" class="secondary-button hidden" type="button">Googleマップで開く</button>
 
+      <button id="addCandidateButton" class="candidate-add-button hidden" type="button">
+        この出発地を候補に追加
+      </button>
+
+      <section class="candidate-section" aria-label="候補地比較">
+        <div class="candidate-header">
+          <div>
+            <p class="eyebrow">CANDIDATES</p>
+            <h2>候補地比較</h2>
+          </div>
+          <span id="candidateCount" class="candidate-count">0件</span>
+        </div>
+
+        <p class="candidate-storage-note">
+          候補はこのタブ内だけに保存します。タブを閉じると消えます。
+        </p>
+
+        <div id="candidateConditionNotice" class="candidate-condition-notice hidden"></div>
+
+        <div id="candidateEmpty" class="candidate-empty">
+          車ルートを検索して、気になる地点を候補に追加してみよう。
+        </div>
+
+        <div id="candidateList" class="candidate-list"></div>
+
+        <button id="clearCandidatesButton" class="candidate-clear-button hidden" type="button">
+          候補をすべて削除
+        </button>
+      </section>
+
       <details>
         <summary>プライバシーとAPI利用</summary>
         <p>経路や場所を検索すると、指定した地点・日時がGoogle Maps Platformへ送信されます。</p>
@@ -119,6 +149,35 @@
       </details>
     </section>
   </main>
+
+  <dialog id="candidateDialog" class="candidate-dialog">
+    <form id="candidateForm" class="candidate-dialog-form">
+      <div class="candidate-dialog-header">
+        <div>
+          <p class="eyebrow">ADD CANDIDATE</p>
+          <h2>候補名をつける</h2>
+        </div>
+        <button id="candidateDialogClose" class="dialog-close-button" type="button" aria-label="閉じる">×</button>
+      </div>
+
+      <label class="input-label" for="candidateNameInput">候補名</label>
+      <input
+        id="candidateNameInput"
+        class="candidate-name-input"
+        type="text"
+        maxlength="40"
+        autocomplete="off"
+        required
+      >
+
+      <p id="candidateDialogSummary" class="candidate-dialog-summary"></p>
+
+      <div class="candidate-dialog-actions">
+        <button id="candidateCancelButton" class="secondary-dialog-button" type="button">キャンセル</button>
+        <button class="primary-dialog-button" type="submit">候補に追加</button>
+      </div>
+    </form>
+  </dialog>
 
   <script type="module" src="./js/app.js"></script>
 </body>

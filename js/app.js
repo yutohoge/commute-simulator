@@ -22,7 +22,9 @@ const state = {
   },
   preset: "NOW",
   mapSelectionTarget: "ORIGIN",
-  lastResults: []
+  lastResults: [],
+  candidates: [],
+  pendingCandidate: null
 };
 
 const el = {
@@ -47,7 +49,21 @@ const el = {
   openGoogleMapsButton: document.getElementById("openGoogleMapsButton"),
   mapTargetOrigin: document.getElementById("mapTargetOrigin"),
   mapTargetDestination: document.getElementById("mapTargetDestination"),
-  mapSelectionHint: document.getElementById("mapSelectionHint")
+  mapSelectionHint: document.getElementById("mapSelectionHint"),
+
+  addCandidateButton: document.getElementById("addCandidateButton"),
+  candidateCount: document.getElementById("candidateCount"),
+  candidateConditionNotice: document.getElementById("candidateConditionNotice"),
+  candidateEmpty: document.getElementById("candidateEmpty"),
+  candidateList: document.getElementById("candidateList"),
+  clearCandidatesButton: document.getElementById("clearCandidatesButton"),
+
+  candidateDialog: document.getElementById("candidateDialog"),
+  candidateForm: document.getElementById("candidateForm"),
+  candidateNameInput: document.getElementById("candidateNameInput"),
+  candidateDialogSummary: document.getElementById("candidateDialogSummary"),
+  candidateDialogClose: document.getElementById("candidateDialogClose"),
+  candidateCancelButton: document.getElementById("candidateCancelButton")
 };
 
 function setStatus(message, type = "") {
@@ -86,6 +102,7 @@ function clearDisplayedResult() {
   el.resultTime.textContent = "";
   el.openGoogleMapsButton.classList.add("hidden");
   state.lastResults = [];
+  updateCandidateAddButton();
 }
 
 function createOriginPin() {
@@ -720,8 +737,12 @@ async function init() {
 
     el.customDateTime.min = toDateTimeLocalValue(new Date(Date.now() + 60000));
 
+    loadCandidates();
+    renderCandidates();
+
     bindEvents();
     updateModeUi();
+    updateCandidateAddButton();
     setMapSelectionTarget("ORIGIN");
   } catch (error) {
     console.error(error);
